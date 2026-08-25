@@ -1,0 +1,33 @@
+{
+	// Configuración de Cloudflare Containers para Akena Watch.
+	// Deploy: npx wrangler deploy   (desde deploy/cloudflare)
+	"name": "akena-watch",
+	"main": "worker/index.ts",
+	"compatibility_date": "2026-08-25",
+	"triggers": {
+		// Keep-alive: despierta el contenedor cada minuto
+		"crons": ["* * * * *"]
+	},
+	"containers": [
+		{
+			"class_name": "AkenaWatch",
+			"image": "../../Dockerfile",
+			"instance_type": "basic",
+			"max_instances": 1
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "class_name": "AkenaWatch", "name": "AKENA_WATCH" }
+		]
+	},
+	"migrations": [
+		{ "new_sqlite_classes": ["AkenaWatch"], "tag": "v1" }
+	],
+	"vars": {
+		// Persistencia: bucket R2 montado con FUSE dentro del contenedor.
+		// Crea el bucket en el dashboard de R2 y ajusta R2_ACCOUNT_ID.
+		"R2_BUCKET_NAME": "akena-data",
+		"R2_ACCOUNT_ID": "TU_ACCOUNT_ID"
+	}
+}

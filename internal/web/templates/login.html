@@ -1,0 +1,21 @@
+{{define "title"}}Iniciar sesión{{end}}
+{{define "content"}}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <div class="auth-logo">{{template "paw" .}}</div>
+    <h1 class="auth-title">Akena Watch</h1>
+    <p class="auth-tagline">Siempre en Guardia</p>
+
+    <form id="login-form" novalidate>
+      <label>Usuario
+        <input name="username" required autocomplete="username">
+      </label>
+      <label>Contraseña
+        <input name="password" type="password" required autocomplete="current-password">
+      </label>
+      <p id="form-error" class="error hidden"></p>
+      <button class="btn primary block" type="submit">Entrar</button>
+    </form>
+  </div>
+</div>
+{{end}}

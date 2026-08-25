@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Formato (gofmt)
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+      - name: Compilación
+        run: go build ./...
+
+      - name: Typecheck del Worker de Cloudflare
+        working-directory: deploy/cloudflare
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Sintaxis del instalador y smoke test
+        run: |
+          sh -n scripts/install.sh
+          sh -n scripts/smoke.sh

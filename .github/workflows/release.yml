@@ -1,0 +1,32 @@
+name: Release
+
+# Publica binarios listos para instalar cuando se crea una etiqueta v*:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Compilar binarios (linux + darwin, amd64 + arm64)
+        run: make release
+
+      - name: Publicar release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/akena-watch-*
+            dist/SHA256SUMS
+          generate_release_notes: true

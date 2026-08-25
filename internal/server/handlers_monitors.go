@@ -1,0 +1,427 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"math"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"akena-watch/internal/monitor"
+	"akena-watch/internal/store"
+)
+
+type monitorInput struct {
+	Name           string  `json:"name"`
+	Type           string  `json:"type"`
+	URL            string  `json:"url"`
+	Method         string  `json:"method"`
+	ExpectedStatus int     `json:"expected_status"`
+	Keyword        string  `json:"keyword"`
+	InvertKeyword  bool    `json:"invert_keyword"`
+	TimeoutS       int     `json:"timeout_s"`
+	IntervalS      int     `json:"interval_s"`
+	Active         *bool   `json:"active"`
+	Public         *bool   `json:"public"`
+	Notify         *bool   `json:"notify"`
+	MaxRetries     int     `json:"max_retries"`
+	NotifierIDs    []int64 `json:"notifier_ids"`
+}
+
+// toMonitor valida la entrada y aplica valores por defecto.
+func (in monitorInput) toMonitor() (store.Monitor, error) {
+	m := store.Monitor{
+		Name:           strings.TrimSpace(in.Name),
+		Type:           in.Type,
+		URL:            strings.TrimSpace(in.URL),
+		Method:         strings.ToUpper(strings.TrimSpace(in.Method)),
+		ExpectedStatus: in.ExpectedStatus,
+		Keyword:        in.Keyword,
+		InvertKeyword:  in.InvertKeyword,
+		TimeoutS:       in.TimeoutS,
+		IntervalS:      in.IntervalS,
+		MaxRetries:     in.MaxRetries,
+	}
+	// Por defecto un monitor nuevo está activo y con alertas habilitadas.
+	m.Active = in.Active == nil || *in.Active
+	m.Notify = in.Notify == nil || *in.Notify
+	if in.Public != nil {
+		m.Public = *in.Public
+	}
+	if m.Method == "" {
+		m.Method = http.MethodGet
+	}
+	if m.ExpectedStatus == 0 {
+		m.ExpectedStatus = 200
+	}
+	if m.TimeoutS == 0 {
+		m.TimeoutS = 10
+	}
+	if m.IntervalS == 0 {
+		m.IntervalS = 60
+	}
+	if m.MaxRetries == 0 {
+		m.MaxRetries = 1
+	}
+
+	if len(m.Name) == 0 || len(m.Name) > 64 {
+		return m, errors.New("el nombre debe tener entre 1 y 64 caracteres")
+	}
+	switch m.Type {
+	case store.TypeHTTP:
+		if !strings.HasPrefix(m.URL, "http://") && !strings.HasPrefix(m.URL, "https://") {
+			return m, errors.New("la URL HTTP debe comenzar con http:// o https://")
+		}
+		switch m.Method {
+		case http.MethodGet, http.MethodPost, http.MethodHead, http.MethodPut,
+			http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		default:
+			return m, errors.New("método HTTP no válido")
+		}
+		if m.ExpectedStatus < 100 || m.ExpectedStatus > 599 {
+			return m, errors.New("el estado HTTP esperado debe estar entre 100 y 599")
+		}
+	case store.TypeTCP, store.TypeDNS:
+		if m.URL == "" {
+			return m, errors.New("el destino no puede estar vacío")
+		}
+	default:
+		return m, errors.New("tipo de monitor no válido (http, tcp o dns)")
+	}
+	if m.TimeoutS < 1 || m.TimeoutS > 120 {
+		return m, errors.New("el timeout debe estar entre 1 y 120 segundos")
+	}
+	if m.IntervalS < 10 || m.IntervalS > 86400 {
+		return m, errors.New("el intervalo debe estar entre 10 segundos y 24 horas")
+	}
+	if m.MaxRetries < 1 || m.MaxRetries > 10 {
+		return m, errors.New("los reintentos deben estar entre 1 y 10")
+	}
+	return m, nil
+}
+
+func parseID(r *http.Request, key string) (int64, error) {
+	return strconv.ParseInt(r.PathValue(key), 10, 64)
+}
+
+func round2(x float64) float64 { return math.Round(x*100) / 100 }
+
+// monitorPayload arma el objeto JSON completo de un monitor para la UI.
+func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error) {
+	p := map[string]any{
+		"id": m.ID, "owner_id": m.OwnerID, "owner": m.OwnerName, "name": m.Name,
+		"type": m.Type, "url": m.URL, "method": m.Method,
+		"expected_status": m.ExpectedStatus, "keyword": m.Keyword, "invert_keyword": m.InvertKeyword,
+		"timeout_s": m.TimeoutS, "interval_s": m.IntervalS,
+		"active": m.Active, "public": m.Public, "notify": m.Notify, "max_retries": m.MaxRetries,
+	}
+
+	now := time.Now()
+	if up, total, err := s.st.Uptime(m.ID, now.Add(-24*time.Hour)); err == nil && total > 0 {
+		p["uptime_24h"] = round2(float64(up) / float64(total) * 100)
+	}
+	if up, total, err := s.st.Uptime(m.ID, now.Add(-7*24*time.Hour)); err == nil && total > 0 {
+		p["uptime_7d"] = round2(float64(up) / float64(total) * 100)
+	}
+	if hb, err := s.st.LatestHeartbeat(m.ID); err == nil && hb != nil {
+		p["last_heartbeat"] = map[string]any{
+			"status": hb.Status, "code": hb.Code, "latency_ms": hb.LatencyMS,
+			"error": hb.Error, "checked_at": hb.CheckedAt.Format(time.RFC3339),
+		}
+	}
+	if shares, err := s.st.ListShares(m.ID); err == nil {
+		list := make([]map[string]any, 0, len(shares))
+		for _, sh := range shares {
+			list = append(list, map[string]any{
+				"user_id": sh.UserID, "username": sh.Username, "can_edit": sh.CanEdit,
+			})
+		}
+		p["shares"] = list
+	}
+	if notifs, err := s.st.ListNotificationsForMonitor(m.ID); err == nil {
+		ids := make([]int64, 0, len(notifs))
+		for _, n := range notifs {
+			ids = append(ids, n.ID)
+		}
+		p["notifier_ids"] = ids
+	}
+	return p, nil
+}
+
+func (s *Server) monitorWithOwner(m store.Monitor) (store.MonitorWithOwner, error) {
+	u, err := s.st.GetUserByID(m.OwnerID)
+	if err != nil {
+		return store.MonitorWithOwner{}, err
+	}
+	return store.MonitorWithOwner{Monitor: m, OwnerName: u.Username}, nil
+}
+
+// --- handlers ---
+
+func (s *Server) handleListMonitors(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	mons, err := s.st.ListMonitorsForUser(u.ID, u.IsAdmin())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	out := make([]map[string]any, 0, len(mons))
+	for _, m := range mons {
+		if p, err := s.monitorPayload(m); err == nil {
+			out = append(out, p)
+		}
+	}
+	writeOK(w, map[string]any{"monitors": out})
+}
+
+func (s *Server) handleCreateMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	var in monitorInput
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	m, err := in.toMonitor()
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	m.OwnerID = u.ID
+	created, err := s.st.CreateMonitor(m)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo crear el monitor")
+		return
+	}
+	if err := s.st.SetMonitorNotifiers(created.ID, in.NotifierIDs); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
+		return
+	}
+	p, _ := s.monitorPayload(store.MonitorWithOwner{Monitor: created, OwnerName: u.Username})
+	writeOK(w, map[string]any{"monitor": p})
+}
+
+func (s *Server) handleGetMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	ok, err := s.st.CanViewMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !ok {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	m, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	mo, err := s.monitorWithOwner(m)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	p, _ := s.monitorPayload(mo)
+	writeOK(w, map[string]any{"monitor": p})
+}
+
+func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	canEdit, err := s.st.CanEditMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !canEdit {
+		writeErr(w, http.StatusForbidden, "no tienes permiso para editar este monitor")
+		return
+	}
+	cur, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+
+	var in monitorInput
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	nm, err := in.toMonitor()
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// conserva identidad y propiedad
+	cur.Name, cur.Type, cur.URL = nm.Name, nm.Type, nm.URL
+	cur.Method, cur.ExpectedStatus, cur.Keyword = nm.Method, nm.ExpectedStatus, nm.Keyword
+	cur.InvertKeyword, cur.TimeoutS, cur.IntervalS = nm.InvertKeyword, nm.TimeoutS, nm.IntervalS
+	cur.Active, cur.Public, cur.Notify, cur.MaxRetries = nm.Active, nm.Public, nm.Notify, nm.MaxRetries
+
+	if err := s.st.UpdateMonitor(cur); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")
+		return
+	}
+	if err := s.st.SetMonitorNotifiers(id, in.NotifierIDs); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
+		return
+	}
+	p, _ := s.monitorPayload(store.MonitorWithOwner{Monitor: cur, OwnerName: u.Username})
+	writeOK(w, map[string]any{"monitor": p})
+}
+
+func (s *Server) handleDeleteMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	canEdit, err := s.st.CanEditMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !canEdit {
+		writeErr(w, http.StatusForbidden, "no tienes permiso para eliminar este monitor")
+		return
+	}
+	if err := s.st.DeleteMonitor(id); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo eliminar el monitor")
+		return
+	}
+	writeOK(w, map[string]any{})
+}
+
+// handleTestMonitor ejecuta un check manual sin guardar resultados.
+func (s *Server) handleTestMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	ok, err := s.st.CanViewMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !ok {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	m, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(m.TimeoutS+5)*time.Second)
+	defer cancel()
+	res := monitor.Check(ctx, m)
+	writeOK(w, map[string]any{
+		"status": res.Status, "code": res.Code, "latency_ms": res.LatencyMS, "error": res.Error,
+	})
+}
+
+func (s *Server) handleHeartbeats(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	ok, err := s.st.CanViewMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !ok {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	hours := int64(24)
+	if h := r.URL.Query().Get("hours"); h != "" {
+		if v, err := strconv.ParseInt(h, 10, 64); err == nil && v > 0 && v <= 24*90 {
+			hours = v
+		}
+	}
+	hb, err := s.st.ListHeartbeats(id, time.Now().Add(-time.Duration(hours)*time.Hour), 1000)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	out := make([]map[string]any, 0, len(hb))
+	for _, h := range hb {
+		out = append(out, map[string]any{
+			"status": h.Status, "code": h.Code, "latency_ms": h.LatencyMS,
+			"error": h.Error, "checked_at": h.CheckedAt.Format(time.RFC3339),
+		})
+	}
+	writeOK(w, map[string]any{"heartbeats": out})
+}
+
+// --- comparticiones ---
+
+func (s *Server) canManageShares(u *store.User, m store.Monitor) bool {
+	return u.IsAdmin() || u.ID == m.OwnerID
+}
+
+func (s *Server) handleSetShare(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	mid, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	uid, err := parseID(r, "uid")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "usuario inválido")
+		return
+	}
+	m, err := s.st.GetMonitor(mid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	if !s.canManageShares(u, m) {
+		writeErr(w, http.StatusForbidden, "solo el propietario puede compartir el monitor")
+		return
+	}
+	if uid == m.OwnerID {
+		writeErr(w, http.StatusBadRequest, "el monitor ya pertenece a ese usuario")
+		return
+	}
+	if _, err := s.st.GetUserByID(uid); err != nil {
+		writeErr(w, http.StatusNotFound, "usuario no encontrado")
+		return
+	}
+	var in struct {
+		CanEdit bool `json:"can_edit"`
+	}
+	_ = readJSON(w, r, &in)
+	if err := s.st.SetShare(mid, uid, in.CanEdit); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo compartir")
+		return
+	}
+	writeOK(w, map[string]any{})
+}
+
+func (s *Server) handleDeleteShare(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	mid, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	uid, err := parseID(r, "uid")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "usuario inválido")
+		return
+	}
+	m, err := s.st.GetMonitor(mid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	if !s.canManageShares(u, m) {
+		writeErr(w, http.StatusForbidden, "solo el propietario puede dejar de compartir")
+		return
+	}
+	if err := s.st.DeleteShare(mid, uid); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo eliminar la compartición")
+		return
+	}
+	writeOK(w, map[string]any{})
+}

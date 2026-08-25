@@ -1,0 +1,17 @@
+{{define "title"}}Monitores{{end}}
+{{define "content"}}
+<div class="page-head">
+  <h1>Monitores</h1>
+  <div class="page-actions">
+    <button id="status-settings-btn" class="btn ghost" type="button">Página de estado</button>
+    <button id="notifs-btn" class="btn ghost" type="button">Canales de alerta</button>
+    <button id="new-monitor-btn" class="btn primary" type="button">+ Nuevo monitor</button>
+  </div>
+</div>
+
+<div id="monitor-list" class="monitor-list">
+  <p class="muted">Cargando…</p>
+</div>
+
+<div id="modal-root"></div>
+{{end}}

@@ -1,0 +1,19 @@
+{{define "title"}}{{.StatusTitle}}{{end}}
+{{define "content"}}
+<div class="status-page">
+  <div class="card status-head">
+    <div class="status-logo">{{template "paw" .}}</div>
+    <h1 id="sp-title">{{.StatusTitle}}</h1>
+    <p id="sp-desc" class="muted">{{.StatusDesc}}</p>
+  </div>
+
+  <div id="sp-list" class="monitor-list" data-slug="{{.Username}}">
+    <p class="muted">Cargando…</p>
+  </div>
+
+  <p class="status-foot muted small">
+    <span class="status-foot-paw">🐾</span>
+    Actualizado automáticamente · <span id="sp-updated">—</span>
+  </p>
+</div>
+{{end}}

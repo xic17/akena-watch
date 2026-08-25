@@ -1,0 +1,27 @@
+{{define "title"}}Instalación{{end}}
+{{define "content"}}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <div class="auth-logo">{{template "paw" .}}</div>
+    <h1 class="auth-title">Akena Watch</h1>
+    <p class="auth-tagline">Siempre en Guardia</p>
+    <p class="muted">Primer arranque: crea la cuenta administradora. Solo habrá un paso.</p>
+
+    <form id="setup-form" novalidate>
+      <label>Usuario
+        <input name="username" required minlength="3" maxlength="32" autocomplete="username"
+               placeholder="p. ej. akena">
+      </label>
+      <label>Contraseña
+        <input name="password" type="password" required minlength="8" autocomplete="new-password"
+               placeholder="mínimo 8 caracteres">
+      </label>
+      <label>Confirmar contraseña
+        <input name="confirm" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <p id="form-error" class="error hidden"></p>
+      <button class="btn primary block" type="submit">Crear administrador</button>
+    </form>
+  </div>
+</div>
+{{end}}

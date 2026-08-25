@@ -1,0 +1,133 @@
+// Package store es la capa de persistencia. SQLite embebida (pure Go,
+// sin cgo) para máxima portabilidad: el mismo archivo de base de datos
+// funciona en cualquier Linux, en un contenedor o montado sobre R2.
+package store
+
+import (
+	"database/sql"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+const timeFmt = time.RFC3339Nano
+
+// Store envuelve la conexión SQLite.
+type Store struct {
+	db *sql.DB
+}
+
+// Open abre (o crea) la base de datos en path y aplica el esquema.
+func Open(path string) (*Store, error) {
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)",
+		filepath.ToSlash(path))
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	// Una sola conexión: serializa el acceso y evita "database is locked".
+	db.SetMaxOpenConns(1)
+
+	s := &Store{db: db}
+	if err := s.migrate(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+func (s *Store) Close() error { return s.db.Close() }
+
+const schema = `
+CREATE TABLE IF NOT EXISTS users (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	password_hash TEXT NOT NULL,
+	role          TEXT NOT NULL DEFAULT 'collaborator',
+	status_title  TEXT NOT NULL DEFAULT 'Estado de los servicios',
+	status_desc   TEXT NOT NULL DEFAULT '',
+	created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+	token      TEXT PRIMARY KEY,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	created_at TEXT NOT NULL,
+	expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS monitors (
+	id               INTEGER PRIMARY KEY AUTOINCREMENT,
+	owner_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name             TEXT NOT NULL,
+	type             TEXT NOT NULL,
+	url              TEXT NOT NULL,
+	method           TEXT NOT NULL DEFAULT 'GET',
+	expected_status  INTEGER NOT NULL DEFAULT 200,
+	keyword          TEXT NOT NULL DEFAULT '',
+	invert_keyword   INTEGER NOT NULL DEFAULT 0,
+	timeout_s        INTEGER NOT NULL DEFAULT 10,
+	interval_s       INTEGER NOT NULL DEFAULT 60,
+	active           INTEGER NOT NULL DEFAULT 1,
+	public           INTEGER NOT NULL DEFAULT 0,
+	notify           INTEGER NOT NULL DEFAULT 1,
+	max_retries      INTEGER NOT NULL DEFAULT 1,
+	created_at       TEXT NOT NULL,
+	updated_at       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS monitor_shares (
+	monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	can_edit   INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (monitor_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS heartbeats (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+	status     TEXT NOT NULL,
+	code       INTEGER NOT NULL DEFAULT 0,
+	latency_ms INTEGER NOT NULL DEFAULT 0,
+	error      TEXT NOT NULL DEFAULT '',
+	checked_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor ON heartbeats(monitor_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS notifications (
+	id       INTEGER PRIMARY KEY AUTOINCREMENT,
+	owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name     TEXT NOT NULL,
+	type     TEXT NOT NULL,
+	config   TEXT NOT NULL,
+	active   INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS monitor_notifiers (
+	monitor_id      INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+	notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+	PRIMARY KEY (monitor_id, notification_id)
+);
+`
+
+func (s *Store) migrate() error {
+	_, err := s.db.Exec(schema)
+	return err
+}
+
+func nowStr() string { return time.Now().UTC().Format(timeFmt) }
+
+func parseTime(s string) time.Time {
+	t, err := time.Parse(timeFmt, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+func isUniqueErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE")
+}

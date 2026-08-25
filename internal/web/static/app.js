@@ -1,0 +1,704 @@
+/* Akena Watch — Siempre en Guardia. Frontend sin dependencias: vanilla JS. */
+"use strict";
+
+// --- utilidades ---
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  });
+  let body = null;
+  try { body = await res.json(); } catch { /* sin cuerpo JSON */ }
+  if (!res.ok) {
+    throw new Error((body && body.error) ? body.error : "Error " + res.status);
+  }
+  return body;
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return "hace " + Math.max(0, Math.round(diff)) + "s";
+  if (diff < 3600) return "hace " + Math.round(diff / 60) + " min";
+  if (diff < 86400) return "hace " + Math.round(diff / 3600) + " h";
+  return d.toLocaleString();
+}
+
+function fmtLat(ms) {
+  if (ms === null || ms === undefined || ms <= 0) return "—";
+  return ms + " ms";
+}
+
+function toast(msg, kind = "ok") {
+  let root = $("#toast-root");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "toast-root";
+    document.body.appendChild(root);
+  }
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .3s"; }, 2600);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// --- modal ---
+function openModal(html) {
+  const root = $("#modal-root");
+  if (!root) return;
+  root.innerHTML =
+    '<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal card">' + html + "</div></div>";
+  const first = $("#modal-root input, #modal-root select, #modal-root button");
+  if (first) first.focus();
+}
+function closeModal() {
+  const root = $("#modal-root");
+  if (root) root.innerHTML = "";
+}
+
+// --- autenticación (setup / login) ---
+function bindAuthForm(formId, endpoint, redirect) {
+  const f = document.getElementById(formId);
+  if (!f) return;
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = $("#form-error");
+    errEl.classList.add("hidden");
+    const fd = new FormData(f);
+    const username = fd.get("username").trim();
+    const password = fd.get("password");
+    const confirm = fd.get("confirm");
+    if (confirm !== null && password !== confirm) {
+      errEl.textContent = "Las contraseñas no coinciden";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    try {
+      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password }) });
+      location.href = res.redirect || redirect;
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    }
+  });
+}
+bindAuthForm("setup-form", "/api/setup", "/dashboard");
+bindAuthForm("login-form", "/api/login", "/dashboard");
+
+const logoutBtn = $("#logout-btn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    try { await api("/api/logout", { method: "POST" }); } catch { /* ignorar */ }
+    location.href = "/login";
+  });
+}
+
+// --- página de estado pública ---
+// El slug viaja en un atributo data- para mantener la plantilla válida.
+const STATUS_SLUG = (() => {
+  const list = document.getElementById("sp-list");
+  return list ? list.dataset.slug : "";
+})();
+if (STATUS_SLUG) {
+  async function loadStatus() {
+    try {
+      const data = await api("/status/" + encodeURIComponent(STATUS_SLUG) + "?json=1");
+      $("#sp-title").textContent = data.title;
+      $("#sp-desc").textContent = data.desc;
+      const list = $("#sp-list");
+      if (!data.monitors.length) {
+        list.innerHTML = '<p class="muted">No hay servicios publicados todavía.</p>';
+      } else {
+        list.innerHTML = data.monitors.map((m) => `
+          <div class="card monitor-row">
+            <span class="dot ${m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
+            <div class="monitor-main">
+              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span></div>
+              ${m.status === "down" && m.error ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
+            </div>
+            <div class="monitor-stat">uptime 30 días<br><b>${m.uptime_30d !== undefined ? m.uptime_30d + "%" : "—"}</b></div>
+            <div class="monitor-stat">${m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
+          </div>`).join("");
+      }
+      $("#sp-updated").textContent = new Date().toLocaleTimeString();
+    } catch (err) {
+      $("#sp-list").innerHTML = `<p class="error">${esc(err.message)}</p>`;
+    }
+  }
+  loadStatus();
+  setInterval(loadStatus, 30000);
+}
+
+// --- dashboard ---
+if (document.getElementById("monitor-list")) {
+  const TYPE_LABEL = { http: "HTTP", tcp: "TCP", dns: "DNS" };
+  let MONITORS = [];
+  let NOTIFS = [];
+  let USERS = [];
+
+  async function loadDashboard() {
+    try {
+      const [m, n, u, sp] = await Promise.all([
+        api("/api/monitors"),
+        api("/api/notifications"),
+        api("/api/users"),
+        api("/api/statuspage"),
+      ]);
+      MONITORS = m.monitors;
+      NOTIFS = n.notifications;
+      USERS = u.users;
+      renderMonitors();
+      renderStatusSettingsBtn(sp);
+      connectWS();
+    } catch (err) {
+      $("#monitor-list").innerHTML = `<p class="error">${esc(err.message)}</p>`;
+    }
+  }
+
+  function renderStatusSettingsBtn(sp) {
+    $("#status-settings-btn").onclick = () => openStatusModal(sp);
+  }
+
+  function renderMonitors() {
+    const list = $("#monitor-list");
+    if (!MONITORS.length) {
+      list.innerHTML = '<p class="muted">Aún no hay monitores. Crea el primero con "+ Nuevo monitor".</p>';
+      return;
+    }
+    list.innerHTML = MONITORS.map((m) => {
+      const lh = m.last_heartbeat;
+      const dot = !lh ? "" : lh.status === "up" ? "up" : "down";
+      return `
+      <div class="card monitor-row" data-id="${m.id}" data-status="${lh ? lh.status : ""}">
+        <span class="dot ${dot}"></span>
+        <div class="monitor-main">
+          <div class="monitor-name">
+            ${esc(m.name)}
+            <span class="badge">${TYPE_LABEL[m.type] || m.type}</span>
+            ${m.public ? '<span class="badge amber">público</span>' : ""}
+            ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
+          </div>
+          <div class="monitor-url muted small">${esc(m.url)}</div>
+          ${lh && lh.status === "down" && lh.error ? `<div class="monitor-url error-text small">${esc(lh.error)}</div>` : ""}
+        </div>
+        <div class="monitor-stat" data-cell="latency">
+          ${!lh ? '<span class="muted">—</span>' : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
+        </div>
+        <div class="monitor-stat">uptime 24 h<br><b>${m.uptime_24h !== undefined ? m.uptime_24h + "%" : "—"}</b></div>
+        <div class="monitor-stat" data-cell="last">último check<br><span class="muted small">${fmtTime(lh && lh.checked_at)}</span></div>
+        <div class="monitor-actions">
+          <button class="btn tiny ghost" type="button" onclick="testMonitor(${m.id}, this)">Probar</button>
+          <button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>
+          <button class="btn tiny danger" type="button" onclick="deleteMonitor(${m.id})">Borrar</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function updateRow(mon) {
+    const row = document.querySelector(`.monitor-row[data-id="${mon.id}"]`);
+    if (!row) return;
+    const lh = { status: mon.status, latency_ms: mon.latency_ms, error: mon.error, checked_at: mon.checked_at };
+    const m = MONITORS.find((x) => x.id === mon.id);
+    if (m) m.last_heartbeat = lh;
+    row.dataset.status = mon.status;
+    $(".dot", row).className = "dot " + (mon.status === "up" ? "up" : "down");
+    const lat = $('[data-cell="latency"]', row);
+    lat.innerHTML = mon.status === "up" ? fmtLat(mon.latency_ms) : '<span class="error-text">caído</span>';
+    const last = $('[data-cell="last"]', row);
+    last.innerHTML = 'último check<br><span class="muted small">' + fmtTime(mon.checked_at) + "</span>";
+    let errCell = $(".monitor-url.error-text", row);
+    if (mon.status === "down" && mon.error) {
+      if (!errCell) {
+        errCell = document.createElement("div");
+        errCell.className = "monitor-url error-text small";
+        $(".monitor-main", row).appendChild(errCell);
+      }
+      errCell.textContent = mon.error;
+    } else if (errCell) {
+      errCell.remove();
+    }
+  }
+
+  // --- WebSocket: tiempo real ---
+  function connectWS() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === "heartbeat") updateRow(msg.monitor);
+    };
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  }
+
+  // --- acciones de monitores ---
+  window.testMonitor = async (id, btn) => {
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      const res = await api(`/api/monitors/${id}/test`, { method: "POST" });
+      toast(res.status === "up" ? "OK · " + fmtLat(res.latency_ms) : "Falló · " + res.error,
+        res.status === "up" ? "ok" : "bad");
+    } catch (err) {
+      toast(err.message, "bad");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Probar";
+    }
+  };
+
+  window.deleteMonitor = async (id) => {
+    const m = MONITORS.find((x) => x.id === id);
+    if (!confirm(`¿Eliminar el monitor "${m ? m.name : id}" y todo su historial?`)) return;
+    try {
+      await api(`/api/monitors/${id}`, { method: "DELETE" });
+      toast("Monitor eliminado");
+      MONITORS = MONITORS.filter((x) => x.id !== id);
+      renderMonitors();
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  // --- modal de monitor (crear / editar) ---
+  window.openMonitorModal = (id) => {
+    const m = id ? MONITORS.find((x) => x.id === id) : null;
+    const isEdit = !!m;
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, public: false, invert_keyword: false, notifier_ids: [] };
+    const shares = (m && m.shares) || [];
+    const notifBoxes = NOTIFS.map((n) =>
+      `<label class="check-row"><input type="checkbox" name="notif" value="${n.id}" ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span></label>`).join("") || '<p class="field-note">No hay canales. Créalos en "Canales de alerta".</p>';
+
+    const shareList = shares.map((sh) =>
+      `<div class="share-row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0">
+        <span>${esc(sh.username)} <span class="badge">${sh.can_edit ? "edición" : "lectura"}</span></span>
+        <button class="btn tiny danger" type="button" onclick="removeShare(${f.id}, ${sh.user_id})">Quitar</button>
+      </div>`).join("");
+
+    const userOpts = USERS.filter((u) => u.id !== ME_ID).map((u) =>
+      `<option value="${u.id}">${esc(u.username)}</option>`).join("");
+
+    const html = `
+      <h2>${isEdit ? "Editar monitor" : "Nuevo monitor"}</h2>
+      <p class="modal-sub muted">Cada monitor se comprueba según su intervalo.</p>
+      <form id="monitor-form">
+        <div class="form-grid">
+          <div class="full">
+            <label>Nombre
+              <input name="name" required maxlength="64" value="${esc(f.name || "")}" placeholder="p. ej. Web principal">
+            </label>
+          </div>
+          <div>
+            <label>Tipo
+              <select name="type" id="m-type">
+                <option value="http" ${f.type === "http" ? "selected" : ""}>HTTP / HTTPS</option>
+                <option value="tcp" ${f.type === "tcp" ? "selected" : ""}>TCP</option>
+                <option value="dns" ${f.type === "dns" ? "selected" : ""}>DNS</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <label>Intervalo (segundos)
+              <input name="interval_s" type="number" min="10" max="86400" required value="${f.interval_s}">
+            </label>
+          </div>
+          <div class="full">
+            <label>Destino (URL o host)
+              <input name="url" required value="${esc(f.url || "")}" placeholder="${f.type === "http" ? "https://ejemplo.com" : "ejemplo.com:443 / ejemplo.com"}">
+            </label>
+          </div>
+          <div id="m-http-fields" class="${f.type === "http" ? "" : "hidden"}">
+            <label>Método
+              <select name="method">
+                ${["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"].map((mth) => `<option ${f.method === mth ? "selected" : ""}>${mth}</option>`).join("")}
+              </select>
+            </label>
+            <label>Estado HTTP esperado
+              <input name="expected_status" type="number" min="100" max="599" value="${f.expected_status}">
+            </label>
+            <label>Palabra clave (opcional)
+              <input name="keyword" value="${esc(f.keyword || "")}" placeholder="buscar en la respuesta">
+            </label>
+            <label class="check-row"><input type="checkbox" name="invert_keyword" ${f.invert_keyword ? "checked" : ""}> Alertar si la palabra clave SÍ aparece</label>
+          </div>
+          <div>
+            <label>Timeout (segundos)
+              <input name="timeout_s" type="number" min="1" max="120" required value="${f.timeout_s}">
+            </label>
+            <label>Reintentos antes de alertar
+              <input name="max_retries" type="number" min="1" max="10" value="${f.max_retries}">
+            </label>
+          </div>
+        </div>
+
+        <label class="check-row"><input type="checkbox" name="active" ${f.active ? "checked" : ""}> Monitor activo</label>
+        <label class="check-row"><input type="checkbox" name="notify" ${f.notify ? "checked" : ""}> Enviar alertas por los canales marcados</label>
+        <label class="check-row"><input type="checkbox" name="public" ${f.public ? "checked" : ""}> Mostrar en la página de estado pública</label>
+
+        <p class="field-note" style="margin-top:14px">Canales de alerta:</p>
+        ${notifBoxes}
+
+        ${isEdit ? `
+          <p class="field-note" style="margin-top:14px">Compartir con:</p>
+          ${shareList}
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <select id="share-user" style="flex:1">${userOpts}</select>
+            <select id="share-mode" style="width:auto">
+              <option value="false">lectura</option>
+              <option value="true">edición</option>
+            </select>
+            <button class="btn tiny" type="button" onclick="addShare(${f.id})">Compartir</button>
+          </div>` : ""}
+
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" type="submit">${isEdit ? "Guardar cambios" : "Crear monitor"}</button>
+        </div>
+      </form>`;
+
+    openModal(html);
+
+    const typeSel = $("#m-type");
+    const toggleHttp = () => $("#m-http-fields").classList.toggle("hidden", typeSel.value !== "http");
+    typeSel.addEventListener("change", toggleHttp);
+
+    $("#monitor-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = {
+        name: fd.get("name").trim(),
+        type: fd.get("type"),
+        url: fd.get("url").trim(),
+        method: fd.get("method") || "GET",
+        expected_status: parseInt(fd.get("expected_status") || "200", 10),
+        keyword: fd.get("keyword") || "",
+        invert_keyword: fd.get("invert_keyword") === "on",
+        timeout_s: parseInt(fd.get("timeout_s"), 10),
+        interval_s: parseInt(fd.get("interval_s"), 10),
+        max_retries: parseInt(fd.get("max_retries") || "1", 10),
+        active: fd.get("active") === "on",
+        notify: fd.get("notify") === "on",
+        public: fd.get("public") === "on",
+        notifier_ids: $$('input[name="notif"]:checked', e.target).map((c) => parseInt(c.value, 10)),
+      };
+      try {
+        if (isEdit) {
+          const res = await api(`/api/monitors/${f.id}`, { method: "PUT", body: JSON.stringify(payload) });
+          const idx = MONITORS.findIndex((x) => x.id === f.id);
+          MONITORS[idx] = res.monitor;
+          toast("Monitor actualizado");
+        } else {
+          const res = await api("/api/monitors", { method: "POST", body: JSON.stringify(payload) });
+          MONITORS.push(res.monitor);
+          toast("Monitor creado");
+        }
+        closeModal();
+        renderMonitors();
+      } catch (err) {
+        toast(err.message, "bad");
+      }
+    });
+  };
+
+  window.addShare = async (monitorId) => {
+    const uid = parseInt($("#share-user").value, 10);
+    const canEdit = $("#share-mode").value === "true";
+    try {
+      await api(`/api/monitors/${monitorId}/share/${uid}`, { method: "PUT", body: JSON.stringify({ can_edit: canEdit }) });
+      toast("Compartido");
+      openMonitorModal(monitorId);
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  window.removeShare = async (monitorId, userId) => {
+    try {
+      await api(`/api/monitors/${monitorId}/share/${userId}`, { method: "DELETE" });
+      toast("Se quitó la compartición");
+      openMonitorModal(monitorId);
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  // --- modal de canales de alerta ---
+  $("#notifs-btn").addEventListener("click", () => openNotifsModal());
+
+  function notifConfigFields(type, cfg = {}) {
+    if (type === "webhook") {
+      return `<label>URL del webhook
+        <input name="cfg_url" type="url" required value="${esc(cfg.url || "")}" placeholder="https://hook.example.com/...">
+      </label>`;
+    }
+    if (type === "telegram") {
+      return `<label>Bot token
+        <input name="cfg_bot_token" value="${esc(cfg.bot_token || "")}" placeholder="123456:ABC-DEF...">
+      </label>
+      <label>Chat ID
+        <input name="cfg_chat_id" value="${esc(cfg.chat_id || "")}" placeholder="-1001234567890">
+      </label>`;
+    }
+    return `<div class="form-grid">
+      <div><label>Host SMTP <input name="cfg_host" required value="${esc(cfg.host || "")}" placeholder="smtp.ejemplo.com"></label></div>
+      <div><label>Puerto <input name="cfg_port" type="number" min="1" max="65535" required value="${cfg.port || 587}"></label></div>
+      <div><label>Usuario <input name="cfg_user" autocomplete="off" value="${esc(cfg.user || "")}"></label></div>
+      <div><label>Contraseña <input name="cfg_pass" type="password" autocomplete="new-password" value="${esc(cfg.pass || "")}"></label></div>
+      <div><label>Desde <input name="cfg_from" required value="${esc(cfg.from || "")}" placeholder="akena@dominio.com"></label></div>
+      <div><label>Para <input name="cfg_to" required value="${esc(cfg.to || "")}" placeholder="quien@dominio.com"></label></div>
+    </div>`;
+  }
+
+  function openNotifsModal() {
+    const rows = NOTIFS.map((n) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <strong>${esc(n.name)}</strong>
+          <span class="badge">${esc(n.type)}</span>
+          ${n.active ? "" : '<span class="badge">inactivo</span>'}
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn tiny ghost" type="button" onclick="openNotifForm(${n.id})">Editar</button>
+          <button class="btn tiny danger" type="button" onclick="deleteNotif(${n.id})">Borrar</button>
+        </div>
+      </div>`).join("") || '<p class="muted">Sin canales de alerta todavía.</p>';
+
+    openModal(`
+      <h2>Canales de alerta</h2>
+      <p class="modal-sub muted">Webhook, Telegram y email SMTP. Luego asócialos a cada monitor.</p>
+      <div style="max-height:260px;overflow-y:auto">${rows}</div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
+        <button class="btn primary" type="button" onclick="openNotifForm()">+ Nuevo canal</button>
+      </div>`);
+  }
+
+  window.openNotifForm = (id) => {
+    const n = id ? NOTIFS.find((x) => x.id === id) : null;
+    const isEdit = !!n;
+    const cfg = (n && n.config) || {};
+    openModal(`
+      <h2>${isEdit ? "Editar canal" : "Nuevo canal"}</h2>
+      <form id="notif-form">
+        <label>Nombre
+          <input name="name" required maxlength="64" value="${esc(n ? n.name : "")}" placeholder="p. ej. Telegram del equipo">
+        </label>
+        <label>Tipo
+          <select name="type" id="n-type" ${isEdit ? "disabled" : ""}>
+            <option value="webhook" ${(n && n.type) === "webhook" || !n ? "selected" : ""}>Webhook</option>
+            <option value="telegram" ${(n && n.type) === "telegram" ? "selected" : ""}>Telegram</option>
+            <option value="smtp" ${(n && n.type) === "smtp" ? "selected" : ""}>Email SMTP</option>
+          </select>
+        </label>
+        <div id="n-fields">${notifConfigFields(n ? n.type : "webhook", cfg)}</div>
+        <label class="check-row"><input type="checkbox" name="active" ${!n || n.active ? "checked" : ""}> Canal activo</label>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" type="submit">${isEdit ? "Guardar" : "Crear canal"}</button>
+        </div>
+      </form>`);
+
+    const typeSel = $("#n-type");
+    const syncFields = () => {
+      $("#n-fields").innerHTML = notifConfigFields(typeSel.value, {});
+    };
+    typeSel.addEventListener("change", syncFields);
+
+    $("#notif-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const type = isEdit ? n.type : fd.get("type");
+      const cfg = {};
+      if (type === "webhook") cfg.url = fd.get("cfg_url");
+      if (type === "telegram") { cfg.bot_token = fd.get("cfg_bot_token"); cfg.chat_id = fd.get("cfg_chat_id"); }
+      if (type === "smtp") {
+        cfg.host = fd.get("cfg_host"); cfg.port = parseInt(fd.get("cfg_port") || "587", 10);
+        cfg.user = fd.get("cfg_user"); cfg.pass = fd.get("cfg_pass");
+        cfg.from = fd.get("cfg_from"); cfg.to = fd.get("cfg_to");
+      }
+      const payload = { name: fd.get("name").trim(), type, config: cfg, active: fd.get("active") === "on" };
+      try {
+        if (isEdit) {
+          const res = await api(`/api/notifications/${n.id}`, { method: "PUT", body: JSON.stringify(payload) });
+          const idx = NOTIFS.findIndex((x) => x.id === n.id);
+          NOTIFS[idx] = res.notification;
+          toast("Canal actualizado");
+        } else {
+          const res = await api("/api/notifications", { method: "POST", body: JSON.stringify(payload) });
+          NOTIFS.push(res.notification);
+          toast("Canal creado");
+        }
+        closeModal();
+        openNotifsModal();
+      } catch (err) {
+        toast(err.message, "bad");
+      }
+    });
+  };
+
+  window.deleteNotif = async (id) => {
+    const n = NOTIFS.find((x) => x.id === id);
+    if (!confirm(`¿Eliminar el canal "${n ? n.name : id}"?`)) return;
+    try {
+      await api(`/api/notifications/${id}`, { method: "DELETE" });
+      NOTIFS = NOTIFS.filter((x) => x.id !== id);
+      toast("Canal eliminado");
+      openNotifsModal();
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  // --- modal de página de estado ---
+  function openStatusModal(sp) {
+    openModal(`
+      <h2>Página de estado pública</h2>
+      <p class="modal-sub muted">Los monitores marcados como "públicos" aparecerán aquí, sin necesidad de iniciar sesión.</p>
+      <form id="status-form">
+        <label>Título
+          <input name="title" maxlength="100" value="${esc(sp.title || "")}">
+        </label>
+        <label>Descripción
+          <textarea name="desc" maxlength="500">${esc(sp.desc || "")}</textarea>
+        </label>
+        <p class="field-note">Dirección pública: <a href="${esc(sp.url || "")}" target="_blank">${esc(sp.url || "")}</a> (${sp.public_count} monitor(es) publicado(s))</p>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
+          <button class="btn primary" type="submit">Guardar</button>
+        </div>
+      </form>`);
+    $("#status-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await api("/api/statuspage", { method: "PUT", body: JSON.stringify({ title: fd.get("title").trim(), desc: fd.get("desc").trim() }) });
+        toast("Página de estado actualizada");
+        closeModal();
+      } catch (err) {
+        toast(err.message, "bad");
+      }
+    });
+  }
+
+  $("#new-monitor-btn").addEventListener("click", () => openMonitorModal());
+
+  // ME_ID se resuelve antes de cargar el dashboard para etiquetar
+  // correctamente los monitores ajenos en los listados.
+  let ME_ID = 0;
+  api("/api/me").then((me) => { ME_ID = me.id; }).catch(() => {}).finally(() => loadDashboard());
+}
+
+// --- gestión de usuarios (solo admin) ---
+if (document.getElementById("user-list")) {
+  let USERS = [];
+
+  async function loadUsers() {
+    try {
+      const res = await api("/api/users");
+      USERS = res.users;
+      renderUsers();
+    } catch (err) {
+      $("#user-list").innerHTML = `<p class="error">${esc(err.message)}</p>`;
+    }
+  }
+
+  function renderUsers() {
+    $("#user-list").innerHTML = `
+      <table class="user-table">
+        <thead><tr><th>Usuario</th><th>Rol</th><th>Monitores</th><th>Creado</th><th></th></tr></thead>
+        <tbody>
+          ${USERS.map((u) => `
+            <tr>
+              <td><strong>${esc(u.username)}</strong></td>
+              <td><span class="role-${esc(u.role)}">${u.role === "admin" ? "Administrador" : "Colaborador"}</span></td>
+              <td>${u.monitors}</td>
+              <td class="muted">${esc(u.created_at)}</td>
+              <td style="text-align:right">
+                <button class="btn tiny ghost" type="button" onclick="toggleRole(${u.id})">${u.role === "admin" ? "Quitar admin" : "Hacer admin"}</button>
+                <button class="btn tiny danger" type="button" onclick="deleteUser(${u.id})">Borrar</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  window.toggleRole = async (id) => {
+    const u = USERS.find((x) => x.id === id);
+    if (!u) return;
+    try {
+      await api(`/api/users/${id}`, { method: "PUT", body: JSON.stringify({ role: u.role === "admin" ? "collaborator" : "admin" }) });
+      toast("Rol actualizado");
+      loadUsers();
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  window.deleteUser = async (id) => {
+    const u = USERS.find((x) => x.id === id);
+    if (!confirm(`¿Eliminar al usuario ${u ? u.username : id}? Se borrarán sus monitores, historial y canales.`)) return;
+    try {
+      await api(`/api/users/${id}`, { method: "DELETE" });
+      toast("Usuario eliminado");
+      loadUsers();
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  $("#new-user-btn").addEventListener("click", () => {
+    openModal(`
+      <h2>Nuevo usuario</h2>
+      <p class="modal-sub muted">Los colaboradores gestionan sus propios monitores.</p>
+      <form id="user-form">
+        <label>Usuario
+          <input name="username" required minlength="3" maxlength="32" autocomplete="off">
+        </label>
+        <label>Contraseña
+          <input name="password" type="password" required minlength="8" autocomplete="new-password">
+        </label>
+        <label>Rol
+          <select name="role">
+            <option value="collaborator">Colaborador</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" type="submit">Crear usuario</button>
+        </div>
+      </form>`);
+    $("#user-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await api("/api/users", {
+          method: "POST",
+          body: JSON.stringify({ username: fd.get("username").trim(), password: fd.get("password"), role: fd.get("role") }),
+        });
+        toast("Usuario creado");
+        closeModal();
+        loadUsers();
+      } catch (err) {
+        toast(err.message, "bad");
+      }
+    });
+  });
+
+  loadUsers();
+}

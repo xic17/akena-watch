@@ -1,0 +1,40 @@
+# Akena Watch — servicio systemd.
+#
+# Uso en Linux plano o CloudPanel 2:
+#   1. Copia el binario y crea el usuario de sistema:
+#        sudo useradd --system --home /opt/akena-watch --shell /usr/sbin/nologin akena
+#        sudo mkdir -p /opt/akena-watch/data
+#   2. Coloca este archivo en /etc/systemd/system/akena-watch.service
+#   3. systemctl daemon-reload && systemctl enable --now akena-watch
+#
+# En CloudPanel 2 el nginx del panel hace de reverse proxy hacia
+# 127.0.0.1:8080 (tipo de sitio "Reverse Proxy"), por eso el bind
+# es solo a loopback.
+
+[Unit]
+Description=Akena Watch - monitor de disponibilidad (Siempre en Guardia)
+Documentation=file:///opt/akena-watch/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=akena
+Group=akena
+WorkingDirectory=/opt/akena-watch
+Environment=AKENA_BIND=127.0.0.1
+Environment=AKENA_PORT=8080
+Environment=AKENA_DATA_DIR=/opt/akena-watch/data
+ExecStart=/opt/akena-watch/akena-watch
+Restart=always
+RestartSec=5
+
+# Endurecimiento básico
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/akena-watch/data
+
+[Install]
+WantedBy=multi-user.target
