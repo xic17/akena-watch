@@ -95,7 +95,7 @@ Los binarios se publican como **GitHub Releases** (linux y darwin, amd64 y
 arm64) con su checksum. Una sola línea:
 
 ```sh
-AKENA_REPO=tu-usuario/akena-watch sh -c "$(curl -sSL https://github.com/tu-usuario/akena-watch/releases/latest/download/install.sh)"
+AKENA_REPO=xic17/akena-watch sh -c "$(curl -sSL https://github.com/xic17/akena-watch/releases/latest/download/install.sh)"
 ```
 
 > El script detecta la plataforma, descarga el binario correcto, **verifica
@@ -107,7 +107,7 @@ Alternativas:
 
 ```sh
 # manual: descarga desde Releases
-curl -sSL -o akena-watch https://github.com/tu-usuario/akena-watch/releases/latest/download/akena-watch-linux-amd64
+curl -sSL -o akena-watch https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-linux-amd64
 chmod +x akena-watch
 ./akena-watch
 
