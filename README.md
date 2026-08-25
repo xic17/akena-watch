@@ -5,7 +5,7 @@ cero dependencias de runtime. Corre en **cualquier Linux**, detrás de un panel
 como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutable.
 
 > 🐾 **En memoria de Akena.** Este proyecto nace como tributo a una compañera
-> mestiza que, durante más de once años, fue guardiana y familia. Su nombre vive
+> mestiza que, durante más de nueve años, fue guardiana y familia. Su nombre vive
 > en cada monitor, cada heartbeat y cada alerta: la misma fidelidad con la que
 > ella cuidó a los suyos es la que este vigilante dedica a tus servicios.
 > *Siempre en Guardia.*
