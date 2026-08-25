@@ -62,6 +62,14 @@ func formatMessage(mon store.Monitor, detail string, latencyMS int, at time.Time
 	return b.String()
 }
 
+// Test envía un mensaje de prueba por el canal indicado, sin tocar
+// ningún monitor. Se usa desde el botón "Probar" de la interfaz.
+func (m *Manager) Test(ch store.Notification) error {
+	return sendChannel(ch, testMessage)
+}
+
+const testMessage = "🧪 Prueba de canal de Akena Watch — si recibes esto, todo funciona.\nSiempre en Guardia."
+
 // --- Canales ---
 
 func sendChannel(ch store.Notification, text string) error {

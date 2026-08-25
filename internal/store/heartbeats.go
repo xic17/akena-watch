@@ -79,6 +79,35 @@ func (s *Store) Uptime(monitorID int64, since time.Time) (up, total int, err err
 	return up, total, err
 }
 
+// ListRecentForMonitors devuelve hasta perMonitor heartbeats por monitor,
+// posteriores a since, para dibujar gráficas. Orden: más recientes primero.
+func (s *Store) ListRecentForMonitors(since time.Time, perMonitor int) ([]Heartbeat, error) {
+	rows, err := s.db.Query(`
+		SELECT id, monitor_id, status, code, latency_ms, error, checked_at
+		FROM heartbeats h
+		WHERE h.id IN (
+			SELECT id FROM (
+				SELECT id, ROW_NUMBER() OVER (PARTITION BY monitor_id ORDER BY id DESC) AS rn
+				FROM heartbeats WHERE checked_at >= ?
+			) WHERE rn <= ?
+		)
+		ORDER BY h.monitor_id, h.id DESC`, since.UTC().Format(timeFmt), perMonitor)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Heartbeat
+	for rows.Next() {
+		h, err := scanHeartbeat(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 // PruneHeartbeats conserva solo los `keep` heartbeats más recientes
 // por monitor y descarta el resto.
 func (s *Store) PruneHeartbeats(keep int) error {

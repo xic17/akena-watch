@@ -129,6 +129,7 @@ if (STATUS_SLUG) {
             <div class="monitor-main">
               <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span></div>
               ${m.status === "down" && m.error ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
+              ${m.history ? `<div class="history-strip" title="Últimas 24 horas">${m.history.map((st) => `<span class="h-cell ${st}"></span>`).join("")}</div>` : ""}
             </div>
             <div class="monitor-stat">uptime 30 días<br><b>${m.uptime_30d !== undefined ? m.uptime_30d + "%" : "—"}</b></div>
             <div class="monitor-stat">${m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
@@ -149,24 +150,89 @@ if (document.getElementById("monitor-list")) {
   let MONITORS = [];
   let NOTIFS = [];
   let USERS = [];
+  let HB = {}; // heartbeats por monitor, para las gráficas
+
+  // buildHB agrupa los heartbeats por monitor y los deja en orden cronológico.
+  function buildHB(heartbeats) {
+    const out = {};
+    for (const h of heartbeats) {
+      (out[h.monitor_id] = out[h.monitor_id] || []).push({
+        lat: h.latency_ms || 0,
+        status: h.status,
+        checked_at: h.checked_at,
+      });
+    }
+    for (const id in out) out[id].reverse();
+    return out;
+  }
 
   async function loadDashboard() {
     try {
-      const [m, n, u, sp] = await Promise.all([
+      const [m, n, u, sp, hb] = await Promise.all([
         api("/api/monitors"),
         api("/api/notifications"),
         api("/api/users"),
         api("/api/statuspage"),
+        api("/api/heartbeats?hours=24"),
       ]);
       MONITORS = m.monitors;
       NOTIFS = n.notifications;
       USERS = u.users;
+      HB = buildHB(hb.heartbeats);
+      renderSummary();
       renderMonitors();
       renderStatusSettingsBtn(sp);
       connectWS();
     } catch (err) {
       $("#monitor-list").innerHTML = `<p class="error">${esc(err.message)}</p>`;
     }
+  }
+
+  // --- resumen estadístico ---
+  function renderSummary() {
+    const el = $("#summary-cards");
+    if (!el) return;
+    const active = MONITORS.filter((m) => m.active);
+    const up = active.filter((m) => m.last_heartbeat && m.last_heartbeat.status === "up").length;
+    const down = active.filter((m) => m.last_heartbeat && m.last_heartbeat.status === "down").length;
+    const pending = active.filter((m) => !m.last_heartbeat).length;
+    const paused = MONITORS.length - active.length;
+    const withUptime = active.filter((m) => typeof m.uptime_24h === "number");
+    const avg = withUptime.length
+      ? withUptime.reduce((a, m) => a + m.uptime_24h, 0) / withUptime.length
+      : null;
+    el.innerHTML = `
+      <div class="stat-card"><span class="stat-value up">${up}</span><span class="stat-label">En línea</span></div>
+      <div class="stat-card"><span class="stat-value down">${down}</span><span class="stat-label">Caídos</span></div>
+      <div class="stat-card"><span class="stat-value amber">${pending}</span><span class="stat-label">Sin datos</span></div>
+      <div class="stat-card"><span class="stat-value">${paused}</span><span class="stat-label">Pausados</span></div>
+      <div class="stat-card"><span class="stat-value">${avg !== null ? avg.toFixed(1) + "%" : "—"}</span><span class="stat-label">Uptime medio 24 h</span></div>`;
+  }
+
+  // --- gráfica de latencia (SVG, sin librerías) ---
+  function pointsFor(m) {
+    return (HB[m.id] || []).map((h) => ({ lat: h.lat, status: h.status }));
+  }
+
+  function sparklineSVG(points) {
+    const w = 140, h = 30;
+    if (!points.length) return '<span class="muted small">sin datos</span>';
+    const maxLat = Math.max(200, ...points.map((p) => p.lat || 0));
+    const n = points.length;
+    const x = (i) => (n === 1 ? w / 2 : (i / (n - 1)) * w);
+    const y = (p) => h - 3 - Math.min(1, (p.lat || 0) / maxLat) * (h - 8);
+    let d = "";
+    let downs = "";
+    points.forEach((p, i) => {
+      d += (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p).toFixed(1);
+      if (p.status === "down") {
+        downs += `<circle cx="${x(i).toFixed(1)}" cy="${y(p).toFixed(1)}" r="2.4" fill="var(--red)"/>`;
+      }
+    });
+    const last = points[points.length - 1];
+    const stroke = last.status === "down" ? "var(--red)" : "var(--green)";
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>${downs}</svg>`;
   }
 
   function renderStatusSettingsBtn(sp) {
@@ -195,6 +261,7 @@ if (document.getElementById("monitor-list")) {
           <div class="monitor-url muted small">${esc(m.url)}</div>
           ${lh && lh.status === "down" && lh.error ? `<div class="monitor-url error-text small">${esc(lh.error)}</div>` : ""}
         </div>
+        <div class="spark-wrap" data-cell="spark" title="Latencia · últimas 24 h">${sparklineSVG(pointsFor(m))}</div>
         <div class="monitor-stat" data-cell="latency">
           ${!lh ? '<span class="muted">—</span>' : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
         </div>
@@ -232,6 +299,13 @@ if (document.getElementById("monitor-list")) {
     } else if (errCell) {
       errCell.remove();
     }
+    // gráfica y resumen en tiempo real
+    const arr = HB[mon.id] || (HB[mon.id] = []);
+    arr.push({ lat: mon.latency_ms || 0, status: mon.status, checked_at: mon.checked_at });
+    if (arr.length > 500) arr.shift();
+    const spark = $('[data-cell="spark"]', row);
+    if (spark) spark.innerHTML = sparklineSVG(pointsFor({ id: mon.id }));
+    renderSummary();
   }
 
   // --- WebSocket: tiempo real ---
@@ -269,6 +343,7 @@ if (document.getElementById("monitor-list")) {
       await api(`/api/monitors/${id}`, { method: "DELETE" });
       toast("Monitor eliminado");
       MONITORS = MONITORS.filter((x) => x.id !== id);
+      renderSummary();
       renderMonitors();
     } catch (err) {
       toast(err.message, "bad");
@@ -408,6 +483,7 @@ if (document.getElementById("monitor-list")) {
           toast("Monitor creado");
         }
         closeModal();
+        renderSummary();
         renderMonitors();
       } catch (err) {
         toast(err.message, "bad");
@@ -473,6 +549,7 @@ if (document.getElementById("monitor-list")) {
           ${n.active ? "" : '<span class="badge">inactivo</span>'}
         </div>
         <div style="display:flex;gap:6px">
+          <button class="btn tiny ghost" type="button" onclick="testNotif(${n.id})">Probar</button>
           <button class="btn tiny ghost" type="button" onclick="openNotifForm(${n.id})">Editar</button>
           <button class="btn tiny danger" type="button" onclick="deleteNotif(${n.id})">Borrar</button>
         </div>
@@ -549,6 +626,15 @@ if (document.getElementById("monitor-list")) {
         toast(err.message, "bad");
       }
     });
+  };
+
+  window.testNotif = async (id) => {
+    try {
+      await api(`/api/notifications/${id}/test`, { method: "POST" });
+      toast("Prueba enviada — revisa el canal");
+    } catch (err) {
+      toast(err.message, "bad");
+    }
   };
 
   window.deleteNotif = async (id) => {

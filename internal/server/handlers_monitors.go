@@ -352,6 +352,46 @@ func (s *Server) handleHeartbeats(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"heartbeats": out})
 }
 
+// handleAllHeartbeats devuelve los heartbeats recientes de todos los
+// monitores visibles para el usuario (para dibujar gráficas de una vez).
+func (s *Server) handleAllHeartbeats(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	hours := int64(24)
+	if h := r.URL.Query().Get("hours"); h != "" {
+		if v, err := strconv.ParseInt(h, 10, 64); err == nil && v > 0 && v <= 24*30 {
+			hours = v
+		}
+	}
+
+	mons, err := s.st.ListMonitorsForUser(u.ID, u.IsAdmin())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	visible := make(map[int64]bool, len(mons))
+	for _, m := range mons {
+		visible[m.ID] = true
+	}
+
+	hb, err := s.st.ListRecentForMonitors(time.Now().Add(-time.Duration(hours)*time.Hour), 500)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	out := make([]map[string]any, 0, len(hb))
+	for _, h := range hb {
+		if !visible[h.MonitorID] {
+			continue
+		}
+		out = append(out, map[string]any{
+			"monitor_id": h.MonitorID, "status": h.Status, "code": h.Code,
+			"latency_ms": h.LatencyMS, "error": h.Error,
+			"checked_at": h.CheckedAt.Format(time.RFC3339),
+		})
+	}
+	writeOK(w, map[string]any{"heartbeats": out})
+}
+
 // --- comparticiones ---
 
 func (s *Server) canManageShares(u *store.User, m store.Monitor) bool {

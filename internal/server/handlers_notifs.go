@@ -150,3 +150,27 @@ func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request
 	}
 	writeOK(w, map[string]any{})
 }
+
+// handleTestNotification envía un mensaje de prueba por el canal indicado.
+func (s *Server) handleTestNotification(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	cur, err := s.st.GetNotification(id)
+	if err != nil || cur.OwnerID != u.ID {
+		writeErr(w, http.StatusNotFound, "canal no encontrado")
+		return
+	}
+	if !cur.Active {
+		writeErr(w, http.StatusBadRequest, "el canal está inactivo")
+		return
+	}
+	if err := s.notify.Test(cur); err != nil {
+		writeErr(w, http.StatusBadGateway, "falló el envío: "+err.Error())
+		return
+	}
+	writeOK(w, map[string]any{"sent": true})
+}

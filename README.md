@@ -50,9 +50,15 @@ como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutabl
 - **Scheduler** con intervalo por monitor (desde 10 segundos), ejecución en
   goroutines y reintentos antes de alertar (evita falsos positivos).
 - **Historial** de heartbeats en SQLite con cálculo de **uptime** (24 h y 7 días).
-- **Tiempo real**: el dashboard se actualiza por WebSocket sin recargar.
-- **Alertas** por webhook genérico, **Telegram** y **email SMTP**.
-- **Página de estado pública** por usuario, sin autenticación.
+- **Resumen estadístico** en el dashboard: en línea, caídos, pausados, sin datos y
+  uptime medio de 24 h.
+- **Gráficas de latencia** (últimas 24 h) por monitor, dibujadas en SVG sin librerías.
+- **Tiempo real**: el dashboard se actualiza por WebSocket sin recargar
+  (estado, latencia, gráfica y resumen).
+- **Alertas** por webhook genérico, **Telegram** y **email SMTP**, con botón de
+  **prueba por canal** para validar la configuración.
+- **Página de estado pública** por usuario, sin autenticación, con **historial
+  visual de las últimas 24 horas** por monitor.
 - **Un solo binario**: el frontend está embebido (`go:embed`); no hay
   `node_modules`, ni pasos de build del frontend, ni dependencias de runtime.
 - Idioma de la interfaz: español.
@@ -366,9 +372,11 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET/POST` | `/api/monitors` | sesión | Listar / crear |
 | `GET/PUT/DELETE` | `/api/monitors/{id}` | sesión + permiso | Consultar / editar / borrar |
 | `POST` | `/api/monitors/{id}/test` | sesión + ver | Check manual (sin guardar) |
-| `GET` | `/api/monitors/{id}/heartbeats?hours=24` | sesión + ver | Historial |
+| `GET` | `/api/monitors/{id}/heartbeats?hours=24` | sesión + ver | Historial de un monitor |
+| `GET` | `/api/heartbeats?hours=24` | sesión | Heartbeats recientes de todos los monitores visibles (gráficas) |
 | `PUT/DELETE` | `/api/monitors/{id}/share/{uid}` | propietario/admin | Compartir / quitar |
 | `GET/POST/PUT/DELETE` | `/api/notifications` | sesión (propias) | Canales de alerta |
+| `POST` | `/api/notifications/{id}/test` | sesión (propias) | Enviar mensaje de prueba por el canal |
 | `GET` | `/api/users` | sesión | Lista de usuarios (para compartir) |
 | `POST/PUT/DELETE` | `/api/users[/{id}]` | **admin** | Gestionar usuarios |
 | `GET/PUT` | `/api/statuspage` | sesión | Página de estado propia |
@@ -446,12 +454,11 @@ akena-watch/
 
 ## Roadmap
 
-- Checks de keyword avanzados, certificados TLS y API REST personalizados.
-- Gráficas de latencia/uptime (heartbeats ya están expuestos por API).
 - 2FA (TOTP) para cuentas administrador.
 - Adaptador de persistencia sobre D1 (Cloudflare) sin tocar el resto del código.
 - Notificaciones adicionales: Discord, Slack, Pushover, ntfysh.
 - Checks ICMP cuando el entorno lo permita (VPS con sockets crudos).
+- Exportación de datos (heartbeats y configuración).
 
 ## Licencia
 
