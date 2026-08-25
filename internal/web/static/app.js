@@ -56,12 +56,12 @@ function toast(msg, kind = "ok") {
 }
 
 // --- modal ---
-function openModal(html) {
+function openModal(html, wide) {
   const root = $("#modal-root");
   if (!root) return;
   root.innerHTML =
     '<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">' +
-    '<div class="modal card">' + html + "</div></div>";
+    '<div class="modal card' + (wide ? " wide" : "") + '">' + html + "</div></div>";
   const first = $("#modal-root input, #modal-root select, #modal-root button");
   if (first) first.focus();
 }
@@ -268,6 +268,7 @@ if (document.getElementById("monitor-list")) {
         <div class="monitor-stat">uptime 24 h<br><b>${m.uptime_24h !== undefined ? m.uptime_24h + "%" : "—"}</b></div>
         <div class="monitor-stat" data-cell="last">último check<br><span class="muted small">${fmtTime(lh && lh.checked_at)}</span></div>
         <div class="monitor-actions">
+          <button class="btn tiny ghost" type="button" onclick="openMonitorDetails(${m.id})">Detalles</button>
           <button class="btn tiny ghost" type="button" onclick="testMonitor(${m.id}, this)">Probar</button>
           <button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>
           <button class="btn tiny danger" type="button" onclick="deleteMonitor(${m.id})">Borrar</button>
@@ -321,6 +322,129 @@ if (document.getElementById("monitor-list")) {
   }
 
   // --- acciones de monitores ---
+  // --- vista de detalle de un monitor ---
+  window.openMonitorDetails = async (id) => {
+    const m = MONITORS.find((x) => x.id === id);
+    if (!m) return;
+    const notifNames = (m.notifier_ids || [])
+      .map((nid) => (NOTIFS.find((n) => n.id === nid) || {}).name)
+      .filter(Boolean);
+    const shareNames = (m.shares || []).map((s) => s.username);
+
+    openModal(`
+      <h2>${esc(m.name)} <span class="badge">${TYPE_LABEL[m.type] || m.type}</span></h2>
+      <p class="modal-sub muted">${esc(m.url)}</p>
+      <div id="md-stats" class="tile-grid"><p class="muted small">Calculando…</p></div>
+      <div class="chart-wrap"><div id="md-chart"><p class="muted small">Cargando gráfica…</p></div></div>
+      <div class="chart-range">
+        <button class="btn tiny ghost active" type="button" data-h="24">24 h</button>
+        <button class="btn tiny ghost" type="button" data-h="168">7 días</button>
+      </div>
+      <p class="field-note">Intervalo ${m.interval_s} s · Timeout ${m.timeout_s} s · Reintentos ${m.max_retries}${notifNames.length ? " · Canales: " + esc(notifNames.join(", ")) : ""}${shareNames.length ? " · Compartido con: " + esc(shareNames.join(", ")) : ""}</p>
+      <div id="md-events"><p class="muted small">Cargando eventos…</p></div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
+      </div>`, true);
+
+    const loadChart = async (hours, btn) => {
+      $$("#md-range button").forEach((b) => b.classList.toggle("active", b === btn));
+      try {
+        const res = await api(`/api/monitors/${id}/heartbeats?hours=${hours}`);
+        renderBigChart(res.heartbeats, hours);
+      } catch (err) {
+        $("#md-chart").innerHTML = `<p class="error">${esc(err.message)}</p>`;
+      }
+    };
+    $$("#md-range button").forEach((b) => {
+      b.onclick = () => loadChart(parseInt(b.dataset.h, 10), b);
+    });
+
+    try {
+      const stats = await api(`/api/monitors/${id}/stats`);
+      renderStatTiles(stats);
+      renderEvents(stats.events);
+    } catch (err) {
+      $("#md-stats").innerHTML = `<p class="error">${esc(err.message)}</p>`;
+    }
+    loadChart(24, $("#md-range button.active"));
+  };
+
+  function renderStatTiles(stats) {
+    const u = stats.uptime;
+    const l = stats.latency;
+    const tile = (label, value, cls = "") =>
+      `<div class="tile"><span class="tile-value ${cls}">${value}</span><span class="tile-label">${label}</span></div>`;
+    $("#md-stats").innerHTML =
+      tile("Uptime 24 h", u["24h"] !== undefined ? u["24h"] + "%" : "—") +
+      tile("Uptime 7 d", u["7d"] !== undefined ? u["7d"] + "%" : "—") +
+      tile("Uptime 30 d", u["30d"] !== undefined ? u["30d"] + "%" : "—") +
+      tile("Checks (7 d)", stats.checks.total + " · " + stats.checks.up + "↑ " + stats.checks.down + "↓") +
+      tile("Latencia mín.", fmtLat(l.min), "up") +
+      tile("Latencia media", fmtLat(Math.round(l.avg)), "") +
+      tile("p95", fmtLat(l.p95), "amber") +
+      tile("Latencia máx.", fmtLat(l.max), "down");
+  }
+
+  function renderEvents(events) {
+    if (!events.length) {
+      $("#md-events").innerHTML = '<p class="muted small">Sin eventos en los últimos 7 días.</p>';
+      return;
+    }
+    $("#md-events").innerHTML = `
+      <p class="field-note" style="margin-top:12px">Últimos eventos (7 días):</p>
+      <div class="events-scroll"><table class="events-table">
+        <thead><tr><th>Hora</th><th>Estado</th><th>Código</th><th>Latencia</th><th>Detalle</th></tr></thead>
+        <tbody>${events.map((e) => `
+          <tr>
+            <td class="muted">${new Date(e.checked_at).toLocaleString()}</td>
+            <td>${e.status === "up" ? '<span class="up-text">En línea</span>' : '<span class="error-text">Caído</span>'}</td>
+            <td>${e.code || "—"}</td>
+            <td>${fmtLat(e.latency_ms)}</td>
+            <td class="muted small">${esc(e.error || "")}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table></div>`;
+  }
+
+  // gráfica grande de latencia (SVG, sin librerías)
+  function renderBigChart(heartbeats, hours) {
+    const points = heartbeats.slice().reverse(); // cronológico
+    if (!points.length) {
+      $("#md-chart").innerHTML = '<p class="muted small">Sin datos en el período.</p>';
+      return;
+    }
+    const w = 520, h = 130;
+    const maxLat = Math.max(200, ...points.map((p) => p.latency_ms || 0));
+    const n = points.length;
+    const x = (i) => (n === 1 ? w / 2 : (i / (n - 1)) * w);
+    const y = (p) => h - 20 - Math.min(1, (p.latency_ms || 0) / maxLat) * (h - 48);
+    let d = "";
+    let downs = "";
+    points.forEach((p, i) => {
+      d += (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p).toFixed(1);
+      if (p.status === "down") {
+        downs += `<circle cx="${x(i).toFixed(1)}" cy="${y(p).toFixed(1)}" r="3.2" fill="var(--red)"/>`;
+      }
+    });
+    const last = points[n - 1];
+    const stroke = last.status === "down" ? "var(--red)" : "var(--green)";
+    const tick = (i) => {
+      const t = new Date(points[i].checked_at);
+      const label =
+        (hours === 24
+          ? t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : t.toLocaleDateString([], { day: "2-digit", month: "2-digit" })) +
+        (i === n - 1 ? " · ahora" : "");
+      return `<text x="${x(i).toFixed(1)}" y="${h - 5}" font-size="10" fill="var(--muted)" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${esc(label)}</text>`;
+    };
+    $("#md-chart").innerHTML = `
+      <svg class="big-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" y1="${h - 16}" x2="${w}" y2="${h - 16}" stroke="var(--border)" stroke-width="1"/>
+        <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2" vector-effect="non-scaling-stroke"/>${downs}
+        ${tick(0)}${tick(Math.floor((n - 1) / 2))}${tick(n - 1)}
+      </svg>`;
+  }
+
   window.testMonitor = async (id, btn) => {
     btn.disabled = true;
     btn.textContent = "…";

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -350,6 +351,87 @@ func (s *Server) handleHeartbeats(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeOK(w, map[string]any{"heartbeats": out})
+}
+
+// handleMonitorStats devuelve estadísticas detalladas de un monitor:
+// uptime en varias ventanas, percentiles de latencia y últimos eventos.
+func (s *Server) handleMonitorStats(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	ok, err := s.st.CanViewMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !ok {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+
+	now := time.Now()
+	uptime := map[string]any{}
+	for _, win := range []struct {
+		key string
+		d   time.Duration
+	}{
+		{"24h", 24 * time.Hour},
+		{"7d", 7 * 24 * time.Hour},
+		{"30d", 30 * 24 * time.Hour},
+	} {
+		if up, total, err := s.st.Uptime(id, now.Add(-win.d)); err == nil && total > 0 {
+			uptime[win.key] = round2(float64(up) / float64(total) * 100)
+		}
+	}
+
+	// latencias y conteos sobre la ventana de 7 días
+	hb, err := s.st.ListHeartbeats(id, now.Add(-7*24*time.Hour), 20000)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	var lats []int
+	up, down := 0, 0
+	for _, h := range hb {
+		if h.LatencyMS > 0 {
+			lats = append(lats, h.LatencyMS)
+		}
+		if h.Status == store.StatusUp {
+			up++
+		} else {
+			down++
+		}
+	}
+
+	latency := map[string]any{"min": 0, "max": 0, "avg": 0, "p95": 0}
+	if len(lats) > 0 {
+		sort.Ints(lats)
+		sum := 0
+		for _, v := range lats {
+			sum += v
+		}
+		latency["min"] = lats[0]
+		latency["max"] = lats[len(lats)-1]
+		latency["avg"] = round2(float64(sum) / float64(len(lats)))
+		latency["p95"] = lats[int(float64(len(lats)-1)*0.95)]
+	}
+
+	events := make([]map[string]any, 0, 20)
+	for _, h := range hb {
+		if len(events) >= 20 {
+			break
+		}
+		events = append(events, map[string]any{
+			"status": h.Status, "code": h.Code, "latency_ms": h.LatencyMS,
+			"error": h.Error, "checked_at": h.CheckedAt.Format(time.RFC3339),
+		})
+	}
+
+	writeOK(w, map[string]any{
+		"uptime":  uptime,
+		"latency": latency,
+		"checks":  map[string]any{"total": up + down, "up": up, "down": down},
+		"events":  events,
+	})
 }
 
 // handleAllHeartbeats devuelve los heartbeats recientes de todos los

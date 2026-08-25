@@ -373,6 +373,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET/PUT/DELETE` | `/api/monitors/{id}` | sesión + permiso | Consultar / editar / borrar |
 | `POST` | `/api/monitors/{id}/test` | sesión + ver | Check manual (sin guardar) |
 | `GET` | `/api/monitors/{id}/heartbeats?hours=24` | sesión + ver | Historial de un monitor |
+| `GET` | `/api/monitors/{id}/stats` | sesión + ver | Estadísticas detalladas (uptime 24 h/7 d/30 d, latencia mín/avg/p95/máx, últimos eventos) |
 | `GET` | `/api/heartbeats?hours=24` | sesión | Heartbeats recientes de todos los monitores visibles (gráficas) |
 | `PUT/DELETE` | `/api/monitors/{id}/share/{uid}` | propietario/admin | Compartir / quitar |
 | `GET/POST/PUT/DELETE` | `/api/notifications` | sesión (propias) | Canales de alerta |

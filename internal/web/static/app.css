@@ -299,9 +299,52 @@ textarea { resize: vertical; min-height: 70px; }
   overflow-y: auto;
 }
 .modal { width: 100%; max-width: 560px; padding: 24px; }
+.modal.wide { max-width: 780px; }
 .modal h2 { margin: 0 0 4px; font-size: 19px; }
 .modal .modal-sub { margin: 0 0 14px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* --- Modal de detalle (estadísticas) --- */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 14px 0; }
+.tile {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tile-value { font-size: 18px; font-weight: 700; }
+.tile-value.up { color: var(--green); }
+.tile-value.down { color: var(--red); }
+.tile-value.amber { color: var(--amber-strong); }
+.tile-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.chart-wrap {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+}
+.chart-wrap svg { width: 100%; height: auto; display: block; }
+.chart-range { display: flex; gap: 6px; margin: 8px 0 4px; }
+.chart-range .btn.active {
+  background: var(--amber-dim);
+  border-color: var(--amber);
+  color: var(--amber-strong);
+}
+.events-scroll { max-height: 240px; overflow-y: auto; margin-top: 4px; }
+.events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.events-table th, .events-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.events-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.events-table tr:last-child td { border-bottom: none; }
+.up-text { color: var(--green); }
 
 /* --- Usuarios --- */
 .user-table { width: 100%; border-collapse: collapse; }
