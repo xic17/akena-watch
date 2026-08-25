@@ -189,7 +189,32 @@ El botón **Probar** ejecuta un check manual sin guardar nada en el historial.
 
 Se configuran por usuario y luego se asocian a cada monitor (varios por monitor):
 
-- **Webhook**: POST JSON (`{"text": "..."}`) a una URL.
+- **Webhook**: POST JSON a una URL. Por defecto envía `{"text": "..."}`, pero
+  puedes definir un **cuerpo JSON personalizado** con variables (estilo Uptime
+  Kuma) para alimentar sistemas como Slack, Discord, n8n o tu propia API:
+
+  ```jsonc
+  {
+    "text": "{{monitorName}} está {{status}}",
+    "url": "{{monitorUrl}}",
+    "latency": "{{latency}}",
+    "at": "{{localtime}}"
+  }
+  ```
+
+  | Variable | Contenido |
+  |---|---|
+  | `{{monitorName}}` | Nombre del monitor |
+  | `{{monitorUrl}}` | Destino monitorizado |
+  | `{{monitorType}}` | `http`, `tcp` o `dns` |
+  | `{{status}}` | `up` o `down` |
+  | `{{msg}}` | Detalle del error (o "sin error reportado") |
+  | `{{latency}}` | Latencia en ms (vacío si no aplica) |
+  | `{{time}}` | Fecha/hora en UTC (ISO 8601) |
+  | `{{localtime}}` | Fecha/hora local `DD/MM/AAAA HH:MM:SS` |
+
+  Los valores se insertan escapados como JSON; si la plantilla no produce
+  JSON válido, el envío falla con un mensaje claro.
 - **Telegram**: bot token + chat ID (`sendMessage` con Markdown).
 - **Email SMTP**: host, puerto, usuario, contraseña, desde, para.
 

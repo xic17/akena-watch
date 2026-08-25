@@ -644,7 +644,12 @@ if (document.getElementById("monitor-list")) {
     if (type === "webhook") {
       return `<label>URL del webhook
         <input name="cfg_url" type="url" required value="${esc(cfg.url || "")}" placeholder="https://hook.example.com/...">
-      </label>`;
+      </label>
+      <label>Cuerpo JSON personalizado (opcional)
+        <textarea name="cfg_body" rows="5" spellcheck="false" placeholder='{"text": "{{monitorName}} está {{status}}", "url": "{{monitorUrl}}"}'>${esc(cfg.body || "")}</textarea>
+      </label>
+      <p class="field-note">Variables: {{monitorName}} {{monitorUrl}} {{monitorType}} {{status}} {{msg}} {{latency}} {{time}} {{localtime}}</p>
+      <p class="field-note">Si se deja vacío, se envía el mensaje por defecto: {"text": "..."}</p>`;
     }
     if (type === "telegram") {
       return `<label>Bot token
@@ -725,7 +730,7 @@ if (document.getElementById("monitor-list")) {
       const fd = new FormData(e.target);
       const type = isEdit ? n.type : fd.get("type");
       const cfg = {};
-      if (type === "webhook") cfg.url = fd.get("cfg_url");
+      if (type === "webhook") { cfg.url = fd.get("cfg_url"); cfg.body = fd.get("cfg_body") || ""; }
       if (type === "telegram") { cfg.bot_token = fd.get("cfg_bot_token"); cfg.chat_id = fd.get("cfg_chat_id"); }
       if (type === "smtp") {
         cfg.host = fd.get("cfg_host"); cfg.port = parseInt(fd.get("cfg_port") || "587", 10);

@@ -22,6 +22,19 @@ type Manager struct {
 
 func NewManager(st *store.Store) *Manager { return &Manager{st: st} }
 
+// vars son los valores disponibles en las plantillas de cuerpo JSON de
+// los webhooks (estilo Uptime Kuma).
+type vars struct {
+	MonitorName string
+	MonitorURL  string
+	MonitorType string
+	Status      string
+	Msg         string
+	Latency     string
+	Time        string
+	Localtime   string
+}
+
 // Send notifica un cambio de estado. recovery=true significa que el
 // monitor volvió a estar en línea.
 func (m *Manager) Send(mon store.Monitor, detail string, latencyMS int, at time.Time, recovery bool) {
@@ -31,9 +44,28 @@ func (m *Manager) Send(mon store.Monitor, detail string, latencyMS int, at time.
 	}
 
 	text := formatMessage(mon, detail, latencyMS, at, recovery)
+	v := vars{
+		MonitorName: mon.Name,
+		MonitorURL:  mon.URL,
+		MonitorType: mon.Type,
+		Status:      "up",
+		Msg:         detail,
+		Time:        at.Format(time.RFC3339),
+		Localtime:   at.Local().Format("02/01/2006 15:04:05"),
+	}
+	if !recovery {
+		v.Status = "down"
+	}
+	if v.Msg == "" {
+		v.Msg = "sin error reportado"
+	}
+	if latencyMS > 0 {
+		v.Latency = fmt.Sprintf("%d ms", latencyMS)
+	}
+
 	for _, ch := range channels {
 		go func(ch store.Notification) {
-			if err := sendChannel(ch, text); err != nil {
+			if err := sendChannel(ch, text, v); err != nil {
 				log.Printf("alerta %q (canal %s): %v", ch.Name, ch.Type, err)
 			}
 		}(ch)
@@ -64,19 +96,31 @@ func formatMessage(mon store.Monitor, detail string, latencyMS int, at time.Time
 
 // Test envía un mensaje de prueba por el canal indicado, sin tocar
 // ningún monitor. Se usa desde el botón "Probar" de la interfaz.
+// Las variables de la plantilla se rellenan con valores de ejemplo
+// para que se vea el renderizado del cuerpo personalizado.
 func (m *Manager) Test(ch store.Notification) error {
-	return sendChannel(ch, testMessage)
+	now := time.Now()
+	return sendChannel(ch, testMessage, vars{
+		MonitorName: "Monitor de prueba",
+		MonitorURL:  "https://ejemplo.com",
+		MonitorType: "http",
+		Status:      "up",
+		Msg:         "Mensaje de prueba — si recibes esto, todo funciona.",
+		Latency:     "45 ms",
+		Time:        now.Format(time.RFC3339),
+		Localtime:   now.Local().Format("02/01/2006 15:04:05"),
+	})
 }
 
 const testMessage = "🧪 Prueba de canal de Akena Watch — si recibes esto, todo funciona.\nSiempre en Guardia."
 
 // --- Canales ---
 
-func sendChannel(ch store.Notification, text string) error {
+func sendChannel(ch store.Notification, text string, v vars) error {
 	client := &http.Client{Timeout: 15 * time.Second}
 	switch ch.Type {
 	case store.NotifWebhook:
-		return sendWebhook(client, ch.Config, text)
+		return sendWebhook(client, ch.Config, text, v)
 	case store.NotifTelegram:
 		return sendTelegram(client, ch.Config, text)
 	case store.NotifSMTP:
@@ -86,10 +130,11 @@ func sendChannel(ch store.Notification, text string) error {
 }
 
 type webhookConfig struct {
-	URL string `json:"url"`
+	URL  string `json:"url"`
+	Body string `json:"body"` // plantilla JSON con {{variables}}
 }
 
-func sendWebhook(client *http.Client, cfgJSON, text string) error {
+func sendWebhook(client *http.Client, cfgJSON, text string, v vars) error {
 	var cfg webhookConfig
 	if err := json.Unmarshal([]byte(cfgJSON), &cfg); err != nil {
 		return err
@@ -97,7 +142,16 @@ func sendWebhook(client *http.Client, cfgJSON, text string) error {
 	if cfg.URL == "" {
 		return fmt.Errorf("URL de webhook vacía")
 	}
-	payload, _ := json.Marshal(map[string]string{"text": text})
+
+	var payload []byte
+	if cfg.Body != "" {
+		payload = []byte(expandTemplate(cfg.Body, v))
+		if !json.Valid(payload) {
+			return fmt.Errorf("el cuerpo personalizado no produce JSON válido (revisa comillas y llaves)")
+		}
+	} else {
+		payload, _ = json.Marshal(map[string]string{"text": text})
+	}
 	req, err := http.NewRequest(http.MethodPost, cfg.URL, bytes.NewReader(payload))
 	if err != nil {
 		return err
@@ -112,6 +166,32 @@ func sendWebhook(client *http.Client, cfgJSON, text string) error {
 		return fmt.Errorf("webhook respondió %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// expandTemplate reemplaza las variables {{...}} del cuerpo JSON
+// personalizado. Los valores se escapan como JSON para poder usarse
+// dentro de comillas: "{{msg}}" -> "detalle con \"comillas\"".
+func expandTemplate(tpl string, v vars) string {
+	r := strings.NewReplacer(
+		"{{monitorName}}", jsonEsc(v.MonitorName),
+		"{{monitorUrl}}", jsonEsc(v.MonitorURL),
+		"{{monitorType}}", jsonEsc(v.MonitorType),
+		"{{status}}", jsonEsc(v.Status),
+		"{{msg}}", jsonEsc(v.Msg),
+		"{{latency}}", jsonEsc(v.Latency),
+		"{{time}}", jsonEsc(v.Time),
+		"{{localtime}}", jsonEsc(v.Localtime),
+	)
+	return r.Replace(tpl)
+}
+
+// jsonEsc escapa un valor para incrustarlo dentro de una cadena JSON.
+func jsonEsc(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil || len(b) < 2 {
+		return s
+	}
+	return string(b[1 : len(b)-1])
 }
 
 type telegramConfig struct {
