@@ -23,18 +23,19 @@ como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutabl
 7. [Monitores](#monitores)
 8. [Canales de alerta](#canales-de-alerta)
 9. [Página de estado pública](#página-de-estado-pública)
-10. [Configuración](#configuración)
-11. [Despliegue](#despliegue)
+10. [Herramientas](#herramientas)
+11. [Configuración](#configuración)
+12. [Despliegue](#despliegue)
     - [Linux plano (systemd)](#linux-plano-systemd)
     - [CloudPanel 2](#cloudpanel-2)
     - [Cloudflare Containers](#cloudflare-containers)
     - [Docker](#docker)
-12. [API](#api)
-13. [Seguridad](#seguridad)
-14. [Limitaciones conocidas](#limitaciones-conocidas)
-15. [Desarrollo](#desarrollo)
-16. [Roadmap](#roadmap)
-17. [Licencia](#licencia)
+13. [API](#api)
+14. [Seguridad](#seguridad)
+15. [Limitaciones conocidas](#limitaciones-conocidas)
+16. [Desarrollo](#desarrollo)
+17. [Roadmap](#roadmap)
+18. [Licencia](#licencia)
 
 ---
 
@@ -232,8 +233,39 @@ Cada usuario puede publicar una página sin autenticación en
 `/status/<usuario>` con los monitores marcados como **público**:
 
 - Configurable desde el dashboard (título + descripción).
-- Muestra estado actual, latencia, uptime de 30 días y último check.
+- Muestra estado actual, latencia, uptime de 30 días, historial visual de las
+  últimas 24 h y último check.
 - Se refresca sola cada 30 segundos.
+
+## Herramientas
+
+Sección de utilidades que se ejecutan **desde el servidor**: miden tu
+infraestructura desde donde corre Akena Watch, no desde el navegador.
+
+### Ping en tiempo real
+
+- **TCP** (por defecto): mide la latencia de conexión a `host:puerto`.
+  Funciona en cualquier entorno sin privilegios (también en Cloudflare
+  Containers).
+- **ICMP**: echo clásico. Requiere permisos de ping en el sistema.
+- Transmite cada paquete por WebSocket (`GET /ws/ping`): estadísticas en vivo
+  (enviados/recibidos/perdidos, mín/media/máx, % de pérdida), gráfica y log.
+  Si el error es permanente (p. ej. ICMP sin permisos), la sesión se detiene
+  con un único aviso claro en lugar de repetir el fallo.
+
+**Habilitar ICMP** (si el servicio corre como usuario sin privilegios, típico
+con systemd, verás `permission denied`):
+
+```sh
+# Opción A (recomendada): habilita el ping para todos los usuarios y
+# sobrevive a las actualizaciones del binario.
+sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
+echo "net.ipv4.ping_group_range=0 2147483647" | sudo tee /etc/sysctl.d/99-ping.conf
+
+# Opción B: da capacidad de red solo al binario.
+# ⚠️ Se pierde al actualizar el binario: hay que repetirlo.
+sudo setcap cap_net_raw+ep /usr/local/bin/akena-watch
+```
 
 ## Configuración
 
@@ -431,8 +463,9 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 
 ## Limitaciones conocidas
 
-- **Sin checks ICMP/ping** (bloqueado en entornos serverless; un VPS podría
-  añadirlo como tipo futuro).
+- Los **monitores** no usan ICMP (bloqueado en entornos serverless y sin
+  permisos). La herramienta de ping sí soporta ICMP cuando el sistema lo
+  permite — ver [Herramientas](#herramientas) para habilitar permisos.
 - Los heartbeats se conservan hasta 5.000 por monitor (poda automática cada hora).
 - En Cloudflare Containers el contenedor puede reiniciarse en otro datacenter;
   la persistencia vía R2 hace que eso sea transparente.
