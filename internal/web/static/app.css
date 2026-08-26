@@ -278,6 +278,16 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .badge.amber { color: var(--amber-strong); border-color: var(--amber); background: var(--amber-dim); }
 .badge.group { color: var(--green); border-color: var(--green); background: rgba(52, 211, 153, 0.08); }
+.badge.paused { color: var(--muted); border-color: var(--border); background: var(--panel); }
+
+/* monitor pausado: fila atenuada, sin luces de estado */
+.monitor-row.paused { opacity: 0.72; }
+.monitor-row.paused .dot { background: var(--muted); box-shadow: none; }
+.monitor-row.paused .spark { opacity: 0.45; }
+
+/* botón de icono (pausa/reproducir) alineado con los demás */
+.icon-btn { line-height: 0; padding: 5px 7px; }
+.icon-btn svg { display: block; }
 
 .error { color: var(--red); font-size: 13.5px; margin: 8px 0 0; }
 .error-text { color: var(--red); }

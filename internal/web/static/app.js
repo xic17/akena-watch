@@ -180,15 +180,15 @@ if (STATUS_SLUG) {
         list.innerHTML = '<p class="muted">No hay servicios publicados todavía.</p>';
       } else {
         list.innerHTML = data.monitors.map((m) => `
-          <div class="card monitor-row">
-            <span class="dot ${m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
+          <div class="card monitor-row${m.active === false ? " paused" : ""}">
+            <span class="dot ${m.active === false ? "" : m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
             <div class="monitor-main">
-              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span></div>
-              ${m.status === "down" && m.error ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
+              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span>${m.active === false ? '<span class="badge paused">pausado</span>' : ""}</div>
+              ${m.status === "down" && m.error && m.active !== false ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
               ${m.history ? `<div class="history-strip" title="Últimas 24 horas">${m.history.map((st) => `<span class="h-cell ${st}"></span>`).join("")}</div>` : ""}
             </div>
             <div class="monitor-stat">uptime 30 días<br><b>${m.uptime_30d !== undefined ? m.uptime_30d + "%" : "—"}</b></div>
-            <div class="monitor-stat">${m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
+            <div class="monitor-stat">${m.active === false ? '<span class="muted">pausado</span>' : m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
           </div>`).join("");
       }
       $("#sp-updated").textContent = new Date().toLocaleTimeString();
@@ -203,6 +203,9 @@ if (STATUS_SLUG) {
 // --- dashboard ---
 if (document.getElementById("monitor-list")) {
   const TYPE_LABEL = { http: "HTTP", tcp: "TCP", dns: "DNS" };
+  // iconos en línea para pausar/reanudar (sin dependencias externas)
+  const PAUSE_ICON = '<svg viewBox="0 0 12 12" width="11" height="11" fill="currentColor" aria-hidden="true"><rect x="2" y="1.5" width="3" height="9" rx="1"/><rect x="7" y="1.5" width="3" height="9" rx="1"/></svg>';
+  const PLAY_ICON = '<svg viewBox="0 0 12 12" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M3 1.6 L10.4 6 L3 10.4 Z"/></svg>';
   let MONITORS = [];
   let NOTIFS = [];
   let USERS = [];
@@ -310,9 +313,9 @@ if (document.getElementById("monitor-list")) {
     }
     list.innerHTML = MONITORS.map((m) => {
       const lh = m.last_heartbeat;
-      const dot = !lh ? "" : lh.status === "up" ? "up" : "down";
+      const dot = !m.active ? "" : !lh ? "" : lh.status === "up" ? "up" : "down";
       return `
-      <div class="card monitor-row" data-id="${m.id}" data-status="${lh ? lh.status : ""}">
+      <div class="card monitor-row${m.active ? "" : " paused"}" data-id="${m.id}" data-status="${lh ? lh.status : ""}">
         <span class="dot ${dot}"></span>
         <div class="monitor-main">
           <div class="monitor-name">
@@ -320,18 +323,20 @@ if (document.getElementById("monitor-list")) {
             <span class="badge">${TYPE_LABEL[m.type] || m.type}</span>
             ${m.group ? `<span class="badge group">📁 ${esc(m.group)}</span>` : ""}
             ${m.public ? '<span class="badge amber">público</span>' : ""}
+            ${!m.active ? '<span class="badge paused">pausado</span>' : ""}
             ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
           </div>
           <div class="monitor-url muted small">${esc(m.url)}</div>
-          ${lh && lh.status === "down" && lh.error ? `<div class="monitor-url error-text small">${esc(lh.error)}</div>` : ""}
+          ${lh && lh.status === "down" && lh.error && m.active ? `<div class="monitor-url error-text small">${esc(lh.error)}</div>` : ""}
         </div>
         <div class="spark-wrap" data-cell="spark" title="Latencia · últimas 24 h">${sparklineSVG(pointsFor(m))}</div>
         <div class="monitor-stat" data-cell="latency">
-          ${!lh ? '<span class="muted">—</span>' : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
+          ${!m.active ? '<span class="muted">pausado</span>' : !lh ? '<span class="muted">—</span>' : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
         </div>
         <div class="monitor-stat">uptime 24 h<br><b>${m.uptime_24h !== undefined ? m.uptime_24h + "%" : "—"}</b></div>
         <div class="monitor-stat" data-cell="last">último check<br><span class="muted small">${fmtTime(lh && lh.checked_at)}</span></div>
         <div class="monitor-actions">
+          ${canEditClient(m) ? `<button class="btn tiny ghost icon-btn" type="button" title="${m.active ? "Pausar" : "Reanudar"}" onclick="togglePause(${m.id})">${m.active ? PAUSE_ICON : PLAY_ICON}</button>` : ""}
           <button class="btn tiny ghost" type="button" onclick="openMonitorDetails(${m.id})">Detalles</button>
           <button class="btn tiny ghost" type="button" onclick="testMonitor(${m.id}, this)">Probar</button>
           ${canEditClient(m) ? `<button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>` : ""}
@@ -533,6 +538,23 @@ if (document.getElementById("monitor-list")) {
       MONITORS = MONITORS.filter((x) => x.id !== id);
       renderSummary();
       renderMonitors();
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  // pausar/reanudar un monitor desde el icono del listado
+  window.togglePause = async (id) => {
+    const m = MONITORS.find((x) => x.id === id);
+    if (!m) return;
+    const target = !m.active;
+    try {
+      const res = await api(`/api/monitors/${id}/active`, { method: "PUT", body: JSON.stringify({ active: target }) });
+      const idx = MONITORS.findIndex((x) => x.id === id);
+      if (idx >= 0) MONITORS[idx] = res.monitor;
+      renderSummary();
+      renderMonitors();
+      toast(target ? "Monitor pausado" : "Monitor reanudado");
     } catch (err) {
       toast(err.message, "bad");
     }

@@ -320,6 +320,45 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"monitor": p})
 }
 
+// handleSetMonitorActive pausa (active=false) o reanuda (active=true) un
+// monitor desde el dashboard: el scheduler lo deja de comprobar al instante.
+func (s *Server) handleSetMonitorActive(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	canEdit, err := s.st.CanEditMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !canEdit {
+		writeErr(w, http.StatusForbidden, "no tienes permiso para modificar este monitor")
+		return
+	}
+	var in struct {
+		Active bool `json:"active"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	if err := s.st.SetMonitorActive(id, in.Active); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")
+		return
+	}
+	m, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	mo, err := s.monitorWithOwner(m)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	p, _ := s.monitorPayload(mo)
+	writeOK(w, map[string]any{"monitor": p})
+}
+
 func (s *Server) handleDeleteMonitor(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	id, err := parseID(r, "id")

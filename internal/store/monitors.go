@@ -82,6 +82,15 @@ func (s *Store) UpdateMonitor(m Monitor) error {
 	return err
 }
 
+// SetMonitorActive pausa (active=false) o reanuda (active=true) un monitor.
+// Los monitores pausados no se comprueban ni alertan hasta reanudarse.
+func (s *Store) SetMonitorActive(id int64, active bool) error {
+	_, err := s.db.Exec(
+		"UPDATE monitors SET active = ?, updated_at = ? WHERE id = ?",
+		boolInt(active), nowStr(), id)
+	return err
+}
+
 func (s *Store) GetMonitor(id int64) (Monitor, error) {
 	row := s.db.QueryRow("SELECT "+monitorCols+" FROM monitors m WHERE m.id = ?", id)
 	return scanMonitor(row)
