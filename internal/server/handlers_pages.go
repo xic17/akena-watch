@@ -83,7 +83,13 @@ func (s *Server) handleUsersPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "users.html", pageData{User: u, IsAdmin: true, Username: u.Username})
 }
 
-// handleAboutPage es pública: es la página de homenaje.
+// handleAboutPage es pública: es la página de homenaje. Si hay sesión,
+// se muestra con la navegación y un botón de vuelta al panel.
 func (s *Server) handleAboutPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "about.html", pageData{})
+	u, err := s.currentUser(r)
+	if err != nil {
+		s.render(w, "about.html", pageData{})
+		return
+	}
+	s.render(w, "about.html", pageData{User: &u, IsAdmin: u.IsAdmin(), Username: u.Username})
 }

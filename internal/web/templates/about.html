@@ -23,5 +23,9 @@
 
     <p class="about-sign">Akena Watch — vigilando por ti, como ella vigiló por nosotros.</p>
   </div>
+
+  <div class="about-back">
+    <a class="btn ghost" href="{{if .User}}/dashboard{{else}}/{{end}}">← {{if .User}}Volver al panel{{else}}Volver{{end}}</a>
+  </div>
 </div>
 {{end}}

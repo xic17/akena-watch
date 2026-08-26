@@ -467,6 +467,9 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .about-card p { text-align: left; }
 .about-sign { margin-top: 22px !important; color: var(--amber-strong); font-weight: 600; }
+.about-back { text-align: center; margin-top: 16px; }
+.about-back .btn { color: var(--muted); }
+.about-back .btn:hover { color: var(--amber-strong); }
 
 /* --- Toast --- */
 #toast-root {
