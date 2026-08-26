@@ -297,6 +297,7 @@ if (document.getElementById("monitor-list")) {
           <div class="monitor-name">
             ${esc(m.name)}
             <span class="badge">${TYPE_LABEL[m.type] || m.type}</span>
+            ${m.group ? `<span class="badge group">📁 ${esc(m.group)}</span>` : ""}
             ${m.public ? '<span class="badge amber">público</span>' : ""}
             ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
           </div>
@@ -382,7 +383,7 @@ if (document.getElementById("monitor-list")) {
         <button class="btn tiny ghost active" type="button" data-h="24">24 h</button>
         <button class="btn tiny ghost" type="button" data-h="168">7 días</button>
       </div>
-      <p class="field-note">Intervalo ${m.interval_s} s · Timeout ${m.timeout_s} s · Reintentos ${m.max_retries}${notifNames.length ? " · Canales: " + esc(notifNames.join(", ")) : ""}${shareNames.length ? " · Compartido con: " + esc(shareNames.join(", ")) : ""}</p>
+      <p class="field-note">${m.group ? "Grupo " + esc(m.group) + " · " : ""}Intervalo ${m.interval_s} s · Timeout ${m.timeout_s} s · Reintentos ${m.max_retries}${notifNames.length ? " · Canales: " + esc(notifNames.join(", ")) : ""}${shareNames.length ? " · Compartido con: " + esc(shareNames.join(", ")) : ""}</p>
       <div id="md-events"><p class="muted small">Cargando eventos…</p></div>
       <div class="modal-actions">
         <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
@@ -520,7 +521,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", notifier_ids: [] };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [] };
     const shares = (m && m.shares) || [];
     const activeNotifs = NOTIFS.filter((n) => n.active);
     const inactiveNotifs = NOTIFS.filter((n) => !n.active);
@@ -567,6 +568,12 @@ if (document.getElementById("monitor-list")) {
             <label>Destino (URL o host)
               <input name="url" required value="${esc(f.url || "")}" placeholder="${f.type === "http" ? "https://ejemplo.com" : "ejemplo.com:443 / ejemplo.com"}">
             </label>
+          </div>
+          <div class="full">
+            <label>Grupo (opcional)
+              <input name="group" maxlength="64" value="${esc(f.group || "")}" placeholder="web, api, base de datos…">
+            </label>
+            <p class="field-note">Los colaboradores pueden recibir acceso a monitores por grupo.</p>
           </div>
           <div id="m-http-fields" class="${f.type === "http" ? "" : "hidden"}">
             <label>Método
@@ -640,6 +647,7 @@ if (document.getElementById("monitor-list")) {
       const fd = new FormData(e.target);
       const payload = {
         name: fd.get("name").trim(),
+        group: fd.get("group").trim(),
         type: fd.get("type"),
         url: fd.get("url").trim(),
         method: fd.get("method") || "GET",
@@ -882,11 +890,19 @@ if (document.getElementById("monitor-list")) {
 // --- gestión de usuarios (solo admin) ---
 if (document.getElementById("user-list")) {
   let USERS = [];
+  let ALL_MONITORS = [];
+  let GROUPS = [];
 
   async function loadUsers() {
     try {
-      const res = await api("/api/users");
+      const [res, mon, grp] = await Promise.all([
+        api("/api/users"),
+        api("/api/monitors"), // el admin ve todos: para asignar acceso manual
+        api("/api/groups"),
+      ]);
       USERS = res.users;
+      ALL_MONITORS = mon.monitors;
+      GROUPS = grp.groups;
       renderUsers();
     } catch (err) {
       $("#user-list").innerHTML = `<p class="error">${esc(err.message)}</p>`;
@@ -904,6 +920,8 @@ if (document.getElementById("user-list")) {
                 <strong>${esc(u.username)}</strong>
                 ${u.email ? `<div class="muted small">${esc(u.email)}</div>` : ""}
                 ${u.telegram_id ? `<div class="muted small">✈️ ${esc(u.telegram_id)}</div>` : ""}
+                ${u.groups && u.groups.length ? `<div class="muted small">Grupos: ${esc(u.groups.join(", "))}</div>` : ""}
+                ${u.access && u.access.length ? `<div class="muted small">${u.access.length} monitor(es) asignados</div>` : ""}
               </td>
               <td><span class="role-${esc(u.role)}">${u.role === "admin" ? "Administrador" : "Colaborador"}</span></td>
               <td>${u.monitors}</td>
@@ -936,19 +954,46 @@ if (document.getElementById("user-list")) {
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Administrador</option>
           </select>
         </label>
+        <div id="user-access" class="${u.role === "admin" ? "hidden" : ""}">
+          <p class="field-note" style="margin-top:14px">Monitores que puede ver:</p>
+          <p class="field-note">Por grupos</p>
+          <div class="access-box">
+            ${GROUPS.length ? GROUPS.map((g) =>
+              `<label class="check-row"><input type="checkbox" name="group" value="${esc(g.name)}" ${(u.groups || []).includes(g.name) ? "checked" : ""}> ${esc(g.name)} <span class="badge">${g.count}</span></label>`).join("") :
+              '<p class="muted small">Aún no hay grupos. Asigna grupos a los monitores.</p>'}
+          </div>
+          <p class="field-note">Monitores específicos</p>
+          <div class="access-box">
+            ${ALL_MONITORS.length ? ALL_MONITORS.map((m) =>
+              `<label class="check-row"><input type="checkbox" name="monitor" value="${m.id}" ${(u.access || []).includes(m.id) ? "checked" : ""}> ${esc(m.name)} <span class="badge">${esc(m.group || m.type)}</span></label>`).join("") :
+              '<p class="muted small">No hay monitores en el sistema.</p>'}
+          </div>
+          <p class="field-note">Los administradores ven todos los monitores.</p>
+        </div>
         <div class="modal-actions">
           <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
           <button class="btn primary" type="submit">Guardar</button>
         </div>
       </form>`);
+    const accessSection = $("#user-access");
+    const roleSel = $("select[name='role']", $("#edit-user-form"));
+    roleSel.addEventListener("change", () => accessSection.classList.toggle("hidden", roleSel.value === "admin"));
     $("#edit-user-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
+      const isAdmin = fd.get("role") === "admin";
       try {
-        await api(`/api/users/${id}`, {
+        const jobs = [api(`/api/users/${id}`, {
           method: "PUT",
           body: JSON.stringify({ role: fd.get("role"), email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }),
-        });
+        })];
+        if (!isAdmin) {
+          const groups = $$('input[name="group"]:checked', e.target).map((c) => c.value);
+          const monitors = $$('input[name="monitor"]:checked', e.target).map((c) => parseInt(c.value, 10));
+          jobs.push(api(`/api/users/${id}/groups`, { method: "PUT", body: JSON.stringify({ groups }) }));
+          jobs.push(api(`/api/users/${id}/access`, { method: "PUT", body: JSON.stringify({ monitor_ids: monitors }) }));
+        }
+        await Promise.all(jobs);
         toast("Usuario actualizado");
         closeModal();
         loadUsers();

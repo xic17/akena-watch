@@ -16,6 +16,7 @@ import (
 
 type monitorInput struct {
 	Name           string  `json:"name"`
+	Group          string  `json:"group"`
 	Type           string  `json:"type"`
 	URL            string  `json:"url"`
 	Method         string  `json:"method"`
@@ -37,6 +38,7 @@ type monitorInput struct {
 func (in monitorInput) toMonitor() (store.Monitor, error) {
 	m := store.Monitor{
 		Name:           strings.TrimSpace(in.Name),
+		Group:          strings.TrimSpace(in.Group),
 		Type:           in.Type,
 		URL:            strings.TrimSpace(in.URL),
 		Method:         strings.ToUpper(strings.TrimSpace(in.Method)),
@@ -75,6 +77,9 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 
 	if len(m.Name) == 0 || len(m.Name) > 64 {
 		return m, errors.New("el nombre debe tener entre 1 y 64 caracteres")
+	}
+	if len(m.Group) > 64 {
+		return m, errors.New("el grupo no puede superar 64 caracteres")
 	}
 	switch m.Type {
 	case store.TypeHTTP:
@@ -122,7 +127,7 @@ func round2(x float64) float64 { return math.Round(x*100) / 100 }
 func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error) {
 	p := map[string]any{
 		"id": m.ID, "owner_id": m.OwnerID, "owner": m.OwnerName, "name": m.Name,
-		"type": m.Type, "url": m.URL, "method": m.Method,
+		"group": m.Group, "type": m.Type, "url": m.URL, "method": m.Method,
 		"expected_status": m.ExpectedStatus, "keyword": m.Keyword, "body": m.Body,
 		"invert_keyword": m.InvertKeyword,
 		"timeout_s":      m.TimeoutS, "interval_s": m.IntervalS,
@@ -182,10 +187,31 @@ func (s *Server) handleListMonitors(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(mons))
 	for _, m := range mons {
 		if p, err := s.monitorPayload(m); err == nil {
+			p["access"] = s.monitorAccess(u, m)
 			out = append(out, p)
 		}
 	}
 	writeOK(w, map[string]any{"monitors": out})
+}
+
+// monitorAccess indica cómo ve el usuario el monitor: "owner", "shared",
+// "group" (por su acceso a grupos) o "admin".
+func (s *Server) monitorAccess(u *store.User, m store.MonitorWithOwner) string {
+	if u.IsAdmin() {
+		return "admin"
+	}
+	if m.OwnerID == u.ID {
+		return "owner"
+	}
+	shares, err := s.st.ListShares(m.ID)
+	if err == nil {
+		for _, sh := range shares {
+			if sh.UserID == u.ID {
+				return "shared"
+			}
+		}
+	}
+	return "group"
 }
 
 func (s *Server) handleCreateMonitor(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +296,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	}
 	// conserva identidad y propiedad
 	cur.Name, cur.Type, cur.URL = nm.Name, nm.Type, nm.URL
+	cur.Group = nm.Group
 	cur.Method, cur.ExpectedStatus, cur.Keyword = nm.Method, nm.ExpectedStatus, nm.Keyword
 	cur.Body, cur.InvertKeyword = nm.Body, nm.InvertKeyword
 	cur.TimeoutS, cur.IntervalS = nm.TimeoutS, nm.IntervalS

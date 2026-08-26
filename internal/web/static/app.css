@@ -277,6 +277,7 @@ textarea { resize: vertical; min-height: 70px; }
   letter-spacing: 0.5px;
 }
 .badge.amber { color: var(--amber-strong); border-color: var(--amber); background: var(--amber-dim); }
+.badge.group { color: var(--green); border-color: var(--green); background: rgba(52, 211, 153, 0.08); }
 
 .error { color: var(--red); font-size: 13.5px; margin: 8px 0 0; }
 .error-text { color: var(--red); }
@@ -341,6 +342,15 @@ textarea { resize: vertical; min-height: 70px; }
   color: var(--amber-strong);
 }
 .events-scroll { max-height: 240px; overflow-y: auto; margin-top: 4px; }
+.access-box {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin: 4px 0 10px;
+  background: var(--panel-2);
+}
 .events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .events-table th, .events-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .events-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }

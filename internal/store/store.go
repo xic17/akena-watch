@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS monitors (
 	id               INTEGER PRIMARY KEY AUTOINCREMENT,
 	owner_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	name             TEXT NOT NULL,
+	group_name       TEXT NOT NULL DEFAULT '',
 	type             TEXT NOT NULL,
 	url              TEXT NOT NULL,
 	method           TEXT NOT NULL DEFAULT 'GET',
@@ -115,6 +116,13 @@ CREATE TABLE IF NOT EXISTS monitor_notifiers (
 	notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
 	PRIMARY KEY (monitor_id, notification_id)
 );
+
+CREATE TABLE IF NOT EXISTS user_groups (
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	group_name TEXT NOT NULL,
+	can_edit   INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (user_id, group_name)
+);
 `
 
 func (s *Store) migrate() error {
@@ -130,7 +138,16 @@ func (s *Store) migrate() error {
 	if err := s.migrateUsersTelegram(); err != nil {
 		return err
 	}
-	return s.migrateMonitorsNotifyOwner()
+	if err := s.migrateMonitorsNotifyOwner(); err != nil {
+		return err
+	}
+	return s.migrateMonitorsGroup()
+}
+
+// migrateMonitorsGroup añade la columna group_name (categoría) a los
+// monitores de bases de datos creadas con esquemas anteriores.
+func (s *Store) migrateMonitorsGroup() error {
+	return s.migraColumna("monitors", "group_name")
 }
 
 // migraColumna añade una columna TEXT con default ” si no existe.

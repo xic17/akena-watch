@@ -167,3 +167,91 @@ func TestMigrateUserEmail(t *testing.T) {
 		t.Fatalf("perfil tras UpdateProfile: %+v", got2)
 	}
 }
+
+// TestGroupsVisibility verifica el acceso de un colaborador por grupos
+// (solo vista) y por monitores asignados manualmente.
+func TestGroupsVisibility(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	owner, err := s.CreateUser("owner", "hash", RoleCollaborator, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewer, err := s.CreateUser("viewer", "hash", RoleCollaborator, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mk := func(name, group string) Monitor {
+		m, err := s.CreateMonitor(Monitor{
+			OwnerID: owner.ID, Name: name, Group: group, Type: TypeHTTP, URL: "https://x.ejemplo.com",
+			Active: true, Notify: true, MaxRetries: 1, TimeoutS: 5, IntervalS: 60,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	m1 := mk("Web", "web")
+	m2 := mk("DB", "db")
+
+	// sin permisos no ve nada
+	if can, _ := s.CanViewMonitor(viewer.ID, m1.ID, false); can {
+		t.Fatal("no debería ver m1 sin permisos")
+	}
+	if list, _ := s.ListMonitorsForUser(viewer.ID, false); len(list) != 0 {
+		t.Fatalf("lista inicial = %d, esperado 0", len(list))
+	}
+
+	// acceso por grupo: solo vista
+	if err := s.SetUserGroups(viewer.ID, []string{"web"}); err != nil {
+		t.Fatal(err)
+	}
+	if can, _ := s.CanViewMonitor(viewer.ID, m1.ID, false); !can {
+		t.Fatal("debería ver m1 por grupo")
+	}
+	if can, _ := s.CanViewMonitor(viewer.ID, m2.ID, false); can {
+		t.Fatal("no debería ver m2")
+	}
+	if canEdit, _ := s.CanEditMonitor(viewer.ID, m1.ID, false); canEdit {
+		t.Fatal("el acceso por grupo solo da vista")
+	}
+
+	// acceso manual a m2
+	if err := s.SetUserManualAccess(viewer.ID, []int64{m2.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if can, _ := s.CanViewMonitor(viewer.ID, m2.ID, false); !can {
+		t.Fatal("debería ver m2 por acceso manual")
+	}
+	if list, _ := s.ListMonitorsForUser(viewer.ID, false); len(list) != 2 {
+		t.Fatalf("lista = %d, esperado 2", len(list))
+	}
+
+	// el colaborador con grupo recibe eventos en tiempo real
+	ids, err := s.ListMonitorViewerIDs(m1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, id := range ids {
+		if id == viewer.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("viewer debería aparecer en ListMonitorViewerIDs")
+	}
+
+	// reemplazar grupos quita el acceso
+	if err := s.SetUserGroups(viewer.ID, []string{}); err != nil {
+		t.Fatal(err)
+	}
+	if can, _ := s.CanViewMonitor(viewer.ID, m1.ID, false); can {
+		t.Fatal("tras quitar el grupo no debería ver m1")
+	}
+}

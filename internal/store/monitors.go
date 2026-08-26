@@ -18,6 +18,7 @@ type Monitor struct {
 	ID             int64
 	OwnerID        int64
 	Name           string
+	Group          string // categoría opcional (web, api, …)
 	Type           string
 	URL            string
 	Method         string
@@ -54,10 +55,10 @@ type Share struct {
 func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	now := nowStr()
 	res, err := s.db.Exec(
-		`INSERT INTO monitors (owner_id, name, type, url, method, expected_status, keyword,
+		`INSERT INTO monitors (owner_id, name, group_name, type, url, method, expected_status, keyword,
 		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.OwnerID, m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.OwnerID, m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, now, now)
 	if err != nil {
@@ -72,10 +73,10 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 
 func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
-		`UPDATE monitors SET name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
+		`UPDATE monitors SET name=?, group_name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
 		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?, updated_at=?
 		 WHERE id=?`,
-		m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
+		m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, nowStr(), m.ID)
 	return err
@@ -96,11 +97,12 @@ func (s *Store) ListMonitorsForUser(userID int64, isAdmin bool) ([]MonitorWithOw
 			"SELECT " + monitorCols + ", u.username FROM monitors m JOIN users u ON u.id = m.owner_id ORDER BY m.name COLLATE NOCASE")
 	} else {
 		rows, err = s.db.Query(
-			`SELECT `+monitorCols+`, u.username FROM monitors m
+			`SELECT DISTINCT `+monitorCols+`, u.username FROM monitors m
 			 JOIN users u ON u.id = m.owner_id
-			 LEFT JOIN monitor_shares ms ON ms.monitor_id = m.id
-			 WHERE m.owner_id = ? OR ms.user_id = ?
-			 ORDER BY m.name COLLATE NOCASE`, userID, userID)
+			 LEFT JOIN monitor_shares ms ON ms.monitor_id = m.id AND ms.user_id = ?
+			 LEFT JOIN user_groups ug ON ug.user_id = ? AND ug.group_name = m.group_name
+			 WHERE m.owner_id = ? OR ms.user_id IS NOT NULL OR ug.user_id IS NOT NULL
+			 ORDER BY m.name COLLATE NOCASE`, userID, userID, userID)
 	}
 	if err != nil {
 		return nil, err
@@ -224,7 +226,7 @@ func (s *Store) ListShares(monitorID int64) ([]Share, error) {
 }
 
 // CanViewMonitor indica si un usuario puede ver un monitor
-// (propietario, compartido o admin).
+// (propietario, compartido, por grupo o admin).
 func (s *Store) CanViewMonitor(userID, monitorID int64, isAdmin bool) (bool, error) {
 	if isAdmin {
 		return true, nil
@@ -233,8 +235,9 @@ func (s *Store) CanViewMonitor(userID, monitorID int64, isAdmin bool) (bool, err
 	err := s.db.QueryRow(
 		`SELECT COUNT(*) FROM monitors m
 		 LEFT JOIN monitor_shares ms ON ms.monitor_id = m.id AND ms.user_id = ?
-		 WHERE m.id = ? AND (m.owner_id = ? OR ms.user_id IS NOT NULL)`,
-		userID, monitorID, userID).Scan(&n)
+		 LEFT JOIN user_groups ug ON ug.user_id = ? AND ug.group_name = m.group_name
+		 WHERE m.id = ? AND (m.owner_id = ? OR ms.user_id IS NOT NULL OR ug.user_id IS NOT NULL)`,
+		userID, userID, monitorID, userID).Scan(&n)
 	return n > 0, err
 }
 
@@ -254,8 +257,8 @@ func (s *Store) CanEditMonitor(userID, monitorID int64, isAdmin bool) (bool, err
 }
 
 // ListMonitorViewerIDs devuelve los IDs de todos los usuarios que deben
-// recibir eventos en tiempo real de un monitor: propietario, compartidos
-// y todos los administradores.
+// recibir eventos en tiempo real de un monitor: propietario, compartidos,
+// usuarios con acceso al grupo del monitor y todos los administradores.
 func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 	rows, err := s.db.Query(
 		`SELECT DISTINCT u.id FROM users u
@@ -264,8 +267,10 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 			UNION
 			SELECT user_id FROM monitor_shares WHERE monitor_id = ?
 			UNION
+			SELECT user_id FROM user_groups WHERE group_name = (SELECT group_name FROM monitors WHERE id = ?)
+			UNION
 			SELECT id FROM users WHERE role = 'admin'
-		 )`, monitorID, monitorID)
+		 )`, monitorID, monitorID, monitorID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +289,7 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 
 // --- helpers de columnas ---
 
-const monitorCols = `m.id, m.owner_id, m.name, m.type, m.url, m.method, m.expected_status,
+const monitorCols = `m.id, m.owner_id, m.name, m.group_name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
 	m.notify_owner, m.max_retries, m.created_at, m.updated_at`
 
@@ -292,7 +297,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
 	var inv, act, pub, not, notOwner int
 	var createdAt, updatedAt string
-	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
+	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -321,7 +326,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var inv, act, pub, not, notOwner int
 	var createdAt, updatedAt string
 	var owner string
-	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
+	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {

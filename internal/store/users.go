@@ -146,6 +146,7 @@ func (s *Store) DeleteUser(id int64) error {
 
 	stmts := []string{
 		"DELETE FROM sessions WHERE user_id = ?",
+		"DELETE FROM user_groups WHERE user_id = ?",
 		"DELETE FROM monitor_shares WHERE user_id = ?",
 		"DELETE FROM monitor_shares WHERE monitor_id IN (SELECT id FROM monitors WHERE owner_id = ?)",
 		"DELETE FROM monitor_notifiers WHERE monitor_id IN (SELECT id FROM monitors WHERE owner_id = ?)",

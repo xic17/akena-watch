@@ -163,8 +163,8 @@ devuelve error y todo pide login.
 
 | Rol | Gestiona usuarios | Monitores |
 |---|---|---|
-| **Administrador** | ✅ crear, editar (rol y correo), eliminar | Ve todos los monitores del sistema y posee los suyos |
-| **Colaborador** | ❌ | Solo sus monitores y los que le compartan |
+| **Administrador** | ✅ crear, editar (rol, correo, Telegram y **accesos**), eliminar | Ve todos los monitores del sistema y posee los suyos |
+| **Colaborador** | ❌ | Sus monitores, los que le compartan y los de sus **grupos/accesos** |
 
 Cada usuario puede llevar en su perfil un **correo** y un **ID de Telegram**
 (opcionales): se piden al crear el usuario (wizard y panel), se pueden editar
@@ -181,6 +181,21 @@ Reglas de protección:
 - **Siempre debe existir al menos un administrador** (protegido por la API).
 - Eliminar un usuario borra en cascada sus monitores, historial, canales y
   comparticiones.
+
+### Grupos y acceso de colaboradores
+
+Los monitores se pueden **categorizar por grupo** (campo "Grupo" al crear o
+editar un monitor: `web`, `api`, `base de datos`, …). En la **ficha del
+usuario** (editar usuario, cuando el rol es colaborador), el administrador
+elige qué monitores puede ver el colaborador, de dos formas combinables:
+
+- **Por grupos**: marcando los grupos completos (todos los monitores de ese
+  grupo, presentes y futuros).
+- **Manual**: marcando monitores específicos uno a uno.
+
+El acceso es de **solo vista** (ver estado, estadísticas y tiempo real); la
+edición sigue controlada por el propietario (compartir con edición). Los
+administradores ven todo por diseño.
 
 ## Monitores
 
@@ -474,8 +489,11 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `PUT/DELETE` | `/api/monitors/{id}/share/{uid}` | propietario/admin | Compartir / quitar |
 | `GET/POST/PUT/DELETE` | `/api/notifications` | sesión (propias) | Canales de alerta |
 | `POST` | `/api/notifications/{id}/test` | sesión (propias) | Enviar mensaje de prueba por el canal |
-| `GET` | `/api/users` | sesión | Lista de usuarios (para compartir) |
+| `GET` | `/api/users` | sesión | Lista de usuarios (para compartir y gestionar) |
+| `GET` | `/api/groups` | sesión | Grupos de monitores con su cantidad |
 | `POST/PUT/DELETE` | `/api/users[/{id}]` | **admin** | Gestionar usuarios |
+| `PUT` | `/api/users/{id}/groups` | **admin** | Acceso del colaborador por grupos |
+| `PUT` | `/api/users/{id}/access` | **admin** | Acceso del colaborador a monitores específicos |
 | `GET/PUT` | `/api/statuspage` | sesión | Página de estado propia |
 | `GET` | `/status/{slug}[?json=1]` | público | Página de estado pública |
 | `GET` | `/ping` | público | Health check (keep-alive Cloudflare) |

@@ -20,12 +20,90 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			n = 0
 		}
+		groups, _ := s.st.GetUserGroups(u.ID)
+		access, _ := s.st.ListUserManualAccess(u.ID)
 		out = append(out, map[string]any{
 			"id": u.ID, "username": u.Username, "email": u.Email, "telegram_id": u.TelegramID,
-			"role": u.Role, "monitors": n, "created_at": u.CreatedAt.Format("2006-01-02"),
+			"role": u.Role, "monitors": n, "groups": groups, "access": access,
+			"created_at": u.CreatedAt.Format("2006-01-02"),
 		})
 	}
 	writeOK(w, map[string]any{"users": out})
+}
+
+// handleListGroups devuelve los grupos existentes con su número de monitores.
+func (s *Server) handleListGroups(w http.ResponseWriter, r *http.Request) {
+	groups, err := s.st.ListGroups()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	out := make([]map[string]any, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, map[string]any{"name": g.Name, "count": g.Count})
+	}
+	writeOK(w, map[string]any{"groups": out})
+}
+
+// handleSetUserGroups asigna los grupos que un colaborador puede ver.
+func (s *Server) handleSetUserGroups(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	if _, err := s.st.GetUserByID(id); err != nil {
+		writeErr(w, http.StatusNotFound, "usuario no encontrado")
+		return
+	}
+	var in struct {
+		Groups []string `json:"groups"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	seen := make(map[string]bool, len(in.Groups))
+	groups := make([]string, 0, len(in.Groups))
+	for _, g := range in.Groups {
+		g = strings.TrimSpace(g)
+		if g == "" || len(g) > 64 || seen[g] {
+			continue
+		}
+		seen[g] = true
+		groups = append(groups, g)
+	}
+	if err := s.st.SetUserGroups(id, groups); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudieron guardar los grupos")
+		return
+	}
+	writeOK(w, map[string]any{"groups": groups})
+}
+
+// handleSetUserAccess asigna manualmente los monitores que un colaborador
+// puede ver (además de los de sus grupos).
+func (s *Server) handleSetUserAccess(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	if _, err := s.st.GetUserByID(id); err != nil {
+		writeErr(w, http.StatusNotFound, "usuario no encontrado")
+		return
+	}
+	var in struct {
+		MonitorIDs []int64 `json:"monitor_ids"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	if err := s.st.SetUserManualAccess(id, in.MonitorIDs); err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo guardar el acceso")
+		return
+	}
+	writeOK(w, map[string]any{})
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
