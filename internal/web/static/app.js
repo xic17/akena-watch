@@ -88,7 +88,14 @@ function bindAuthForm(formId, endpoint, redirect) {
       return;
     }
     try {
-      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password, email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }) });
+      // solo se envían los campos presentes en el formulario: el login no
+      // acepta email/telegram_id y el servidor rechaza campos desconocidos.
+      const payload = { username, password };
+      const email = fd.get("email");
+      const tg = fd.get("telegram_id");
+      if (email !== null) payload.email = email.trim();
+      if (tg !== null) payload.telegram_id = tg.trim();
+      const res = await api(endpoint, { method: "POST", body: JSON.stringify(payload) });
       location.href = res.redirect || redirect;
     } catch (err) {
       errEl.textContent = err.message;
