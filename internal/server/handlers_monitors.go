@@ -28,6 +28,7 @@ type monitorInput struct {
 	Active         *bool   `json:"active"`
 	Public         *bool   `json:"public"`
 	Notify         *bool   `json:"notify"`
+	NotifyOwner    *bool   `json:"notify_owner"`
 	MaxRetries     int     `json:"max_retries"`
 	NotifierIDs    []int64 `json:"notifier_ids"`
 }
@@ -52,6 +53,9 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 	m.Notify = in.Notify == nil || *in.Notify
 	if in.Public != nil {
 		m.Public = *in.Public
+	}
+	if in.NotifyOwner != nil {
+		m.NotifyOwner = *in.NotifyOwner
 	}
 	if m.Method == "" {
 		m.Method = http.MethodGet
@@ -122,7 +126,8 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"expected_status": m.ExpectedStatus, "keyword": m.Keyword, "body": m.Body,
 		"invert_keyword": m.InvertKeyword,
 		"timeout_s":      m.TimeoutS, "interval_s": m.IntervalS,
-		"active": m.Active, "public": m.Public, "notify": m.Notify, "max_retries": m.MaxRetries,
+		"active": m.Active, "public": m.Public, "notify": m.Notify, "notify_owner": m.NotifyOwner,
+		"max_retries": m.MaxRetries,
 	}
 
 	now := time.Now()
@@ -269,6 +274,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	cur.Body, cur.InvertKeyword = nm.Body, nm.InvertKeyword
 	cur.TimeoutS, cur.IntervalS = nm.TimeoutS, nm.IntervalS
 	cur.Active, cur.Public, cur.Notify, cur.MaxRetries = nm.Active, nm.Public, nm.Notify, nm.MaxRetries
+	cur.NotifyOwner = nm.NotifyOwner
 
 	if err := s.st.UpdateMonitor(cur); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")

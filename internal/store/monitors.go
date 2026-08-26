@@ -30,6 +30,7 @@ type Monitor struct {
 	Active         bool
 	Public         bool
 	Notify         bool
+	NotifyOwner    bool // avisar al propietario por su Telegram del perfil
 	MaxRetries     int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -54,11 +55,11 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	now := nowStr()
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, type, url, method, expected_status, keyword,
-		 body, invert_keyword, timeout_s, interval_s, active, public, notify, max_retries, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
-		boolInt(m.Notify), m.MaxRetries, now, now)
+		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, now, now)
 	if err != nil {
 		return Monitor{}, err
 	}
@@ -72,11 +73,11 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
-		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, max_retries=?, updated_at=?
+		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
-		boolInt(m.Notify), m.MaxRetries, nowStr(), m.ID)
+		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, nowStr(), m.ID)
 	return err
 }
 
@@ -285,14 +286,14 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 
 const monitorCols = `m.id, m.owner_id, m.name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
-	m.max_retries, m.created_at, m.updated_at`
+	m.notify_owner, m.max_retries, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
-	var inv, act, pub, not int
+	var inv, act, pub, not, notOwner int
 	var createdAt, updatedAt string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
-		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
+		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
@@ -304,6 +305,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	m.Active = act == 1
 	m.Public = pub == 1
 	m.Notify = not == 1
+	m.NotifyOwner = notOwner == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
 	return m, nil
@@ -316,11 +318,11 @@ type monitorRowScanner interface {
 
 func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var m Monitor
-	var inv, act, pub, not int
+	var inv, act, pub, not, notOwner int
 	var createdAt, updatedAt string
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
-		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
+		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound
@@ -332,6 +334,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	m.Active = act == 1
 	m.Public = pub == 1
 	m.Notify = not == 1
+	m.NotifyOwner = notOwner == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
 	return MonitorWithOwner{Monitor: m, OwnerName: owner}, nil

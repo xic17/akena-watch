@@ -114,6 +114,34 @@ func (m *Manager) Test(ch store.Notification) error {
 
 const testMessage = "🧪 Prueba de canal de Akena Watch — si recibes esto, todo funciona.\nSiempre en Guardia."
 
+// NotifyOwner envía la alerta directamente al Telegram del propietario
+// del monitor (su ID de perfil), usando el bot de su primer canal de
+// Telegram. Se ignora en silencio si no hay ID o canal configurado.
+func (m *Manager) NotifyOwner(mon store.Monitor, detail string, latencyMS int, at time.Time, recovery bool) {
+	owner, err := m.st.GetUserByID(mon.OwnerID)
+	if err != nil || strings.TrimSpace(owner.TelegramID) == "" {
+		return
+	}
+	ch, err := m.st.FirstTelegramChannel(mon.OwnerID)
+	if err != nil {
+		return
+	}
+	var cfg telegramConfig
+	if err := json.Unmarshal([]byte(ch.Config), &cfg); err != nil {
+		return
+	}
+	if cfg.BotToken == "" {
+		return
+	}
+	text := formatMessage(mon, detail, latencyMS, at, recovery)
+	go func() {
+		client := &http.Client{Timeout: 15 * time.Second}
+		if err := sendTelegramMsg(client, cfg.BotToken, owner.TelegramID, text); err != nil {
+			log.Printf("aviso al propietario %q (monitor %d): %v", owner.Username, mon.ID, err)
+		}
+	}()
+}
+
 // --- Canales ---
 
 func sendChannel(ch store.Notification, text string, v vars) error {
@@ -204,16 +232,21 @@ func sendTelegram(client *http.Client, cfgJSON, text string) error {
 	if err := json.Unmarshal([]byte(cfgJSON), &cfg); err != nil {
 		return err
 	}
-	if cfg.BotToken == "" || cfg.ChatID == "" {
+	return sendTelegramMsg(client, cfg.BotToken, cfg.ChatID, text)
+}
+
+// sendTelegramMsg envía un mensaje con un bot concreto a un chat concreto.
+func sendTelegramMsg(client *http.Client, botToken, chatID, text string) error {
+	if botToken == "" || chatID == "" {
 		return fmt.Errorf("configuración de Telegram incompleta")
 	}
 	payload, _ := json.Marshal(map[string]any{
-		"chat_id":                  cfg.ChatID,
+		"chat_id":                  chatID,
 		"text":                     text,
 		"parse_mode":               "Markdown",
 		"disable_web_page_preview": true,
 	})
-	url := "https://api.telegram.org/bot" + cfg.BotToken + "/sendMessage"
+	url := "https://api.telegram.org/bot" + botToken + "/sendMessage"
 	resp, err := client.Post(url, "application/json", bytes.NewReader(payload))
 	if err != nil {
 		return err

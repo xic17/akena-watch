@@ -95,6 +95,20 @@ func (s *Store) ListNotificationsForMonitor(monitorID int64) ([]Notification, er
 	return out, rows.Err()
 }
 
+// FirstTelegramChannel devuelve el primer canal de Telegram activo de un
+// usuario (para enviarle alertas directas a su ID de perfil).
+func (s *Store) FirstTelegramChannel(userID int64) (Notification, error) {
+	row := s.db.QueryRow(
+		`SELECT id, owner_id, name, type, config, active FROM notifications
+		 WHERE owner_id = ? AND type = 'telegram' AND active = 1
+		 ORDER BY id LIMIT 1`, userID)
+	n, err := scanNotification(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Notification{}, ErrNotFound
+	}
+	return n, err
+}
+
 func (s *Store) DeleteNotification(id int64) error {
 	_, err := s.db.Exec("DELETE FROM notifications WHERE id = ?", id)
 	return err

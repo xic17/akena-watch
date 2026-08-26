@@ -88,7 +88,7 @@ function bindAuthForm(formId, endpoint, redirect) {
       return;
     }
     try {
-      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password, email: (fd.get("email") || "").trim() }) });
+      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password, email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }) });
       location.href = res.redirect || redirect;
     } catch (err) {
       errEl.textContent = err.message;
@@ -104,6 +104,48 @@ if (logoutBtn) {
   logoutBtn.addEventListener("click", async () => {
     try { await api("/api/logout", { method: "POST" }); } catch { /* ignorar */ }
     location.href = "/login";
+  });
+}
+
+// --- mi perfil (correo + ID de Telegram) ---
+const profileBtn = $("#profile-btn");
+if (profileBtn) {
+  profileBtn.addEventListener("click", async () => {
+    try {
+      const me = await api("/api/me");
+      openModal(`
+        <h2>Mi perfil</h2>
+        <p class="modal-sub muted">${esc(me.username)} · ${esc(me.role === "admin" ? "Administrador" : "Colaborador")}</p>
+        <form id="profile-form">
+          <label>Correo (opcional)
+            <input name="email" type="email" maxlength="254" autocomplete="off" value="${esc(me.email || "")}" placeholder="usuario@dominio.com">
+          </label>
+          <label>ID de Telegram (opcional)
+            <input name="telegram_id" maxlength="32" autocomplete="off" spellcheck="false" value="${esc(me.telegram_id || "")}" placeholder="123456789 o -1001234567890">
+          </label>
+          <p class="field-note">Con tu ID en el perfil, los monitores con "Avisarme por Telegram" te notifican directamente.</p>
+          <div class="modal-actions">
+            <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
+            <button class="btn primary" type="submit">Guardar</button>
+          </div>
+        </form>`);
+      $("#profile-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+          await api("/api/me", {
+            method: "PUT",
+            body: JSON.stringify({ email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }),
+          });
+          toast("Perfil actualizado");
+          closeModal();
+        } catch (err) {
+          toast(err.message, "bad");
+        }
+      });
+    } catch (err) {
+      toast(err.message, "bad");
+    }
   });
 }
 
@@ -478,7 +520,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, public: false, invert_keyword: false, body: "", notifier_ids: [] };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", notifier_ids: [] };
     const shares = (m && m.shares) || [];
     const notifBoxes = NOTIFS.map((n) =>
       `<label class="check-row"><input type="checkbox" name="notif" value="${n.id}" ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span></label>`).join("") || '<p class="field-note">No hay canales. Créalos en "Canales de alerta".</p>';
@@ -553,6 +595,7 @@ if (document.getElementById("monitor-list")) {
 
         <label class="check-row"><input type="checkbox" name="active" ${f.active ? "checked" : ""}> Monitor activo</label>
         <label class="check-row"><input type="checkbox" name="notify" ${f.notify ? "checked" : ""}> Enviar alertas por los canales marcados</label>
+        <label class="check-row"><input type="checkbox" name="notify_owner" ${f.notify_owner ? "checked" : ""}> Avisarme por Telegram (a mi ID del perfil)</label>
         <label class="check-row"><input type="checkbox" name="public" ${f.public ? "checked" : ""}> Mostrar en la página de estado pública</label>
 
         <p class="field-note" style="margin-top:14px">Canales de alerta:</p>
@@ -604,6 +647,7 @@ if (document.getElementById("monitor-list")) {
         max_retries: parseInt(fd.get("max_retries") || "1", 10),
         active: fd.get("active") === "on",
         notify: fd.get("notify") === "on",
+        notify_owner: fd.get("notify_owner") === "on",
         public: fd.get("public") === "on",
         notifier_ids: $$('input[name="notif"]:checked', e.target).map((c) => parseInt(c.value, 10)),
       };
@@ -854,6 +898,7 @@ if (document.getElementById("user-list")) {
               <td>
                 <strong>${esc(u.username)}</strong>
                 ${u.email ? `<div class="muted small">${esc(u.email)}</div>` : ""}
+                ${u.telegram_id ? `<div class="muted small">✈️ ${esc(u.telegram_id)}</div>` : ""}
               </td>
               <td><span class="role-${esc(u.role)}">${u.role === "admin" ? "Administrador" : "Colaborador"}</span></td>
               <td>${u.monitors}</td>
@@ -877,6 +922,9 @@ if (document.getElementById("user-list")) {
         <label>Correo (opcional)
           <input name="email" type="email" maxlength="254" autocomplete="off" value="${esc(u.email || "")}" placeholder="usuario@dominio.com">
         </label>
+        <label>ID de Telegram (opcional)
+          <input name="telegram_id" maxlength="32" autocomplete="off" spellcheck="false" value="${esc(u.telegram_id || "")}" placeholder="123456789 o -1001234567890">
+        </label>
         <label>Rol
           <select name="role">
             <option value="collaborator" ${u.role === "collaborator" ? "selected" : ""}>Colaborador</option>
@@ -894,7 +942,7 @@ if (document.getElementById("user-list")) {
       try {
         await api(`/api/users/${id}`, {
           method: "PUT",
-          body: JSON.stringify({ role: fd.get("role"), email: (fd.get("email") || "").trim() }),
+          body: JSON.stringify({ role: fd.get("role"), email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }),
         });
         toast("Usuario actualizado");
         closeModal();
@@ -928,6 +976,9 @@ if (document.getElementById("user-list")) {
         <label>Correo (opcional)
           <input name="email" type="email" maxlength="254" autocomplete="off" placeholder="usuario@dominio.com">
         </label>
+        <label>ID de Telegram (opcional)
+          <input name="telegram_id" maxlength="32" autocomplete="off" spellcheck="false" placeholder="123456789 o -1001234567890">
+        </label>
         <label>Contraseña
           <input name="password" type="password" required minlength="8" autocomplete="new-password">
         </label>
@@ -948,7 +999,7 @@ if (document.getElementById("user-list")) {
       try {
         await api("/api/users", {
           method: "POST",
-          body: JSON.stringify({ username: fd.get("username").trim(), email: (fd.get("email") || "").trim(), password: fd.get("password"), role: fd.get("role") }),
+          body: JSON.stringify({ username: fd.get("username").trim(), email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim(), password: fd.get("password"), role: fd.get("role") }),
         });
         toast("Usuario creado");
         closeModal();

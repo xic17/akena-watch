@@ -25,6 +25,7 @@ type User struct {
 	ID           int64
 	Username     string
 	Email        string
+	TelegramID   string
 	PasswordHash string
 	Role         string
 	StatusTitle  string
@@ -43,11 +44,11 @@ func (s *Store) CountUsers() (int, error) {
 }
 
 // CreateUser crea un usuario y devuelve la fila completa.
-func (s *Store) CreateUser(username, passwordHash, role, email string) (User, error) {
+func (s *Store) CreateUser(username, passwordHash, role, email, telegramID string) (User, error) {
 	res, err := s.db.Exec(
-		`INSERT INTO users (username, email, password_hash, role, status_title, status_desc, created_at)
-		 VALUES (?, ?, ?, ?, 'Estado de los servicios', '', ?)`,
-		username, email, passwordHash, role, nowStr())
+		`INSERT INTO users (username, email, telegram_id, password_hash, role, status_title, status_desc, created_at)
+		 VALUES (?, ?, ?, ?, ?, 'Estado de los servicios', '', ?)`,
+		username, email, telegramID, passwordHash, role, nowStr())
 	if err != nil {
 		if isUniqueErr(err) {
 			if strings.Contains(err.Error(), "users.username") {
@@ -66,14 +67,14 @@ func (s *Store) CreateUser(username, passwordHash, role, email string) (User, er
 
 func (s *Store) GetUserByID(id int64) (User, error) {
 	row := s.db.QueryRow(
-		`SELECT id, username, email, password_hash, role, status_title, status_desc, created_at
+		`SELECT id, username, email, telegram_id, password_hash, role, status_title, status_desc, created_at
 		 FROM users WHERE id = ?`, id)
 	return scanUser(row)
 }
 
 func (s *Store) GetUserByUsername(username string) (User, error) {
 	row := s.db.QueryRow(
-		`SELECT id, username, email, password_hash, role, status_title, status_desc, created_at
+		`SELECT id, username, email, telegram_id, password_hash, role, status_title, status_desc, created_at
 		 FROM users WHERE username = ?`, username)
 	return scanUser(row)
 }
@@ -81,7 +82,7 @@ func (s *Store) GetUserByUsername(username string) (User, error) {
 // ListUsers devuelve todos los usuarios ordenados por nombre.
 func (s *Store) ListUsers() ([]User, error) {
 	rows, err := s.db.Query(
-		`SELECT id, username, email, password_hash, role, status_title, status_desc, created_at
+		`SELECT id, username, email, telegram_id, password_hash, role, status_title, status_desc, created_at
 		 FROM users ORDER BY username COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
@@ -99,9 +100,20 @@ func (s *Store) ListUsers() ([]User, error) {
 	return users, rows.Err()
 }
 
-// UpdateUser actualiza el rol y el correo de un usuario.
-func (s *Store) UpdateUser(id int64, role, email string) error {
-	_, err := s.db.Exec("UPDATE users SET role = ?, email = ? WHERE id = ?", role, email, id)
+// UpdateUser actualiza el rol, el correo y el ID de Telegram de un usuario.
+func (s *Store) UpdateUser(id int64, role, email, telegramID string) error {
+	_, err := s.db.Exec("UPDATE users SET role = ?, email = ?, telegram_id = ? WHERE id = ?",
+		role, email, telegramID, id)
+	if err != nil && isUniqueErr(err) {
+		return ErrEmailTaken
+	}
+	return err
+}
+
+// UpdateProfile actualiza el correo y el ID de Telegram de un usuario
+// (auto-servicio: no toca el rol).
+func (s *Store) UpdateProfile(id int64, email, telegramID string) error {
+	_, err := s.db.Exec("UPDATE users SET email = ?, telegram_id = ? WHERE id = ?", email, telegramID, id)
 	if err != nil && isUniqueErr(err) {
 		return ErrEmailTaken
 	}
@@ -165,7 +177,7 @@ func (s *Store) CreateSession(userID int64, token string, ttl time.Duration) err
 // Las sesiones expiradas se eliminan al detectarse.
 func (s *Store) UserForSession(token string) (User, error) {
 	row := s.db.QueryRow(
-		`SELECT u.id, u.username, u.email, u.password_hash, u.role, u.status_title, u.status_desc, u.created_at
+		`SELECT u.id, u.username, u.email, u.telegram_id, u.password_hash, u.role, u.status_title, u.status_desc, u.created_at
 		 FROM sessions s JOIN users u ON u.id = s.user_id
 		 WHERE s.token = ? AND s.expires_at > ?`,
 		token, nowStr())
@@ -190,7 +202,7 @@ type scanner interface {
 func scanUser(row scanner) (User, error) {
 	var u User
 	var createdAt string
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.StatusTitle, &u.StatusDesc, &createdAt)
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.TelegramID, &u.PasswordHash, &u.Role, &u.StatusTitle, &u.StatusDesc, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}

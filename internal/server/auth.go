@@ -150,6 +150,20 @@ func validateEmail(email string) error {
 	return nil
 }
 
+var telegramRe = regexp.MustCompile(`^-?\d{1,32}$`)
+
+// validateTelegramID valida un ID de chat de Telegram opcional
+// (vacío es válido; los chats de grupo/canal pueden ser negativos).
+func validateTelegramID(id string) error {
+	if id == "" {
+		return nil
+	}
+	if !telegramRe.MatchString(id) {
+		return errors.New("el ID de Telegram debe ser numérico (p. ej. 123456789 o -1001234567890)")
+	}
+	return nil
+}
+
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	n, err := s.st.CountUsers()
 	if err != nil {
@@ -162,9 +176,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var in struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		Email      string `json:"email"`
+		TelegramID string `json:"telegram_id"`
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "solicitud inválida")
@@ -172,11 +187,16 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Username = strings.TrimSpace(in.Username)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.TelegramID = strings.TrimSpace(in.TelegramID)
 	if err := validateCredentials(in.Username, in.Password); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := validateEmail(in.Email); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateTelegramID(in.TelegramID); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -186,7 +206,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "error interno")
 		return
 	}
-	u, err := s.st.CreateUser(in.Username, string(hash), store.RoleAdmin, in.Email)
+	u, err := s.st.CreateUser(in.Username, string(hash), store.RoleAdmin, in.Email, in.TelegramID)
 	if err == store.ErrEmailTaken {
 		writeErr(w, http.StatusBadRequest, "ese correo ya está registrado")
 		return
@@ -232,11 +252,44 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	writeOK(w, map[string]any{
-		"id":       u.ID,
-		"username": u.Username,
-		"email":    u.Email,
-		"role":     u.Role,
+		"id":          u.ID,
+		"username":    u.Username,
+		"email":       u.Email,
+		"telegram_id": u.TelegramID,
+		"role":        u.Role,
 	})
+}
+
+// handleUpdateProfile permite a cada usuario editar su propio perfil:
+// correo e ID de Telegram.
+func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	var in struct {
+		Email      string `json:"email"`
+		TelegramID string `json:"telegram_id"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "solicitud inválida")
+		return
+	}
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.TelegramID = strings.TrimSpace(in.TelegramID)
+	if err := validateEmail(in.Email); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateTelegramID(in.TelegramID); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.st.UpdateProfile(u.ID, in.Email, in.TelegramID); err == store.ErrEmailTaken {
+		writeErr(w, http.StatusBadRequest, "ese correo ya está registrado")
+		return
+	} else if err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el perfil")
+		return
+	}
+	writeOK(w, map[string]any{"email": in.Email, "telegram_id": in.TelegramID})
 }
 
 func (s *Server) handlePing(w http.ResponseWriter, _ *http.Request) {

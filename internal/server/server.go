@@ -63,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 
 	// API autenticada
 	mux.HandleFunc("GET /api/me", s.authJSON(s.handleMe))
+	mux.HandleFunc("PUT /api/me", s.authJSON(s.handleUpdateProfile))
 	mux.HandleFunc("GET /api/monitors", s.authJSON(s.handleListMonitors))
 	mux.HandleFunc("POST /api/monitors", s.authJSON(s.handleCreateMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}", s.authJSON(s.handleGetMonitor))

@@ -159,13 +159,23 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 	transition := st.status != "" && st.status != res.Status
 	st.status = res.Status
 
-	if m.Notify && s.notify != nil {
+	if s.notify != nil {
 		if res.Status == store.StatusDown && st.consecutiveFailures >= m.MaxRetries && !st.downAlerted {
 			st.downAlerted = true
-			go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
+			if m.Notify {
+				go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
+			}
+			if m.NotifyOwner {
+				s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
+			}
 		} else if res.Status == store.StatusUp && st.downAlerted {
 			st.downAlerted = false
-			go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+			if m.Notify {
+				go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+			}
+			if m.NotifyOwner {
+				s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+			}
 		}
 	}
 	s.mu.Unlock()

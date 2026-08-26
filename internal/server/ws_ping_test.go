@@ -24,7 +24,7 @@ func TestPingToolWS(t *testing.T) {
 	}
 	defer st.Close()
 
-	u, err := st.CreateUser("akena", "hash", store.RoleAdmin, "")
+	u, err := st.CreateUser("akena", "hash", store.RoleAdmin, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestPingToolWSRejectsBadHost(t *testing.T) {
 	}
 	defer st.Close()
 
-	u, err := st.CreateUser("akena", "hash", store.RoleAdmin, "")
+	u, err := st.CreateUser("akena", "hash", store.RoleAdmin, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,8 +21,8 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 			n = 0
 		}
 		out = append(out, map[string]any{
-			"id": u.ID, "username": u.Username, "email": u.Email, "role": u.Role,
-			"monitors": n, "created_at": u.CreatedAt.Format("2006-01-02"),
+			"id": u.ID, "username": u.Username, "email": u.Email, "telegram_id": u.TelegramID,
+			"role": u.Role, "monitors": n, "created_at": u.CreatedAt.Format("2006-01-02"),
 		})
 	}
 	writeOK(w, map[string]any{"users": out})
@@ -30,10 +30,11 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
-		Email    string `json:"email"`
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		Role       string `json:"role"`
+		Email      string `json:"email"`
+		TelegramID string `json:"telegram_id"`
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "solicitud inválida")
@@ -41,11 +42,16 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Username = strings.TrimSpace(in.Username)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.TelegramID = strings.TrimSpace(in.TelegramID)
 	if err := validateCredentials(in.Username, in.Password); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := validateEmail(in.Email); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateTelegramID(in.TelegramID); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -57,7 +63,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "error interno")
 		return
 	}
-	u, err := s.st.CreateUser(in.Username, string(hash), in.Role, in.Email)
+	u, err := s.st.CreateUser(in.Username, string(hash), in.Role, in.Email, in.TelegramID)
 	if err == store.ErrUsernameTaken {
 		writeErr(w, http.StatusBadRequest, "ese nombre de usuario ya existe")
 		return
@@ -71,7 +77,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]any{
-		"user": map[string]any{"id": u.ID, "username": u.Username, "email": u.Email, "role": u.Role},
+		"user": map[string]any{"id": u.ID, "username": u.Username, "email": u.Email, "telegram_id": u.TelegramID, "role": u.Role},
 	})
 }
 
@@ -83,8 +89,9 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Role  string `json:"role"`
-		Email string `json:"email"`
+		Role       string `json:"role"`
+		Email      string `json:"email"`
+		TelegramID string `json:"telegram_id"`
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "solicitud inválida")
@@ -95,7 +102,12 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.TelegramID = strings.TrimSpace(in.TelegramID)
 	if err := validateEmail(in.Email); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateTelegramID(in.TelegramID); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -115,7 +127,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.st.UpdateUser(id, in.Role, in.Email); err == store.ErrEmailTaken {
+	if err := s.st.UpdateUser(id, in.Role, in.Email, in.TelegramID); err == store.ErrEmailTaken {
 		writeErr(w, http.StatusBadRequest, "ese correo ya está registrado")
 		return
 	} else if err != nil {

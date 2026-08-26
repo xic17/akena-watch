@@ -166,10 +166,14 @@ devuelve error y todo pide login.
 | **Administrador** | ✅ crear, editar (rol y correo), eliminar | Ve todos los monitores del sistema y posee los suyos |
 | **Colaborador** | ❌ | Solo sus monitores y los que le compartan |
 
-Cada usuario puede llevar un **correo asociado** (opcional): se pide al crear
-el usuario (wizard y panel) y se puede editar después. Validado en formato y
-**único** entre usuarios (los vacíos no cuentan). Queda listo para futuras
-funciones como recuperación de contraseña o notificaciones por correo.
+Cada usuario puede llevar en su perfil un **correo** y un **ID de Telegram**
+(opcionales): se piden al crear el usuario (wizard y panel), se pueden editar
+desde **"Mi perfil"** (botón en la barra superior) y por el administrador en
+la edición de usuarios. El correo se valida en formato y es **único** entre
+usuarios (los vacíos no cuentan). El **ID de Telegram** (numérico, puede ser
+negativo para grupos/canales) habilita la opción de cada monitor
+**"Avisarme por Telegram"**: las alertas de caída/recuperación se envían
+**directamente a tu ID** usando el bot de tu primer canal de Telegram.
 
 Reglas de protección:
 
@@ -460,6 +464,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `POST` | `/api/setup` | público (1 vez) | Crea el primer administrador |
 | `POST` | `/api/login` / `/api/logout` | público | Sesión |
 | `GET` | `/api/me` | sesión | Usuario actual |
+| `PUT` | `/api/me` | sesión | Editar mi perfil (correo e ID de Telegram) |
 | `GET/POST` | `/api/monitors` | sesión | Listar / crear |
 | `GET/PUT/DELETE` | `/api/monitors/{id}` | sesión + permiso | Consultar / editar / borrar |
 | `POST` | `/api/monitors/{id}/test` | sesión + ver | Check manual (sin guardar) |

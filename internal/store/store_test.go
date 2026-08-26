@@ -14,7 +14,7 @@ func TestMonitorCRUD(t *testing.T) {
 	}
 	defer s.Close()
 
-	u, err := s.CreateUser("akena", "hash", RoleAdmin, "")
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestMigrateBodyColumn(t *testing.T) {
 	}
 	defer s.Close()
 
-	u, err := s.CreateUser("akena", "hash", RoleAdmin, "")
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestMigrateUserEmail(t *testing.T) {
 	}
 	defer s.Close()
 
-	u, err := s.CreateUser("akena", "hash", RoleAdmin, "akena@ejemplo.com")
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "akena@ejemplo.com", "123456789")
 	if err != nil {
 		t.Fatalf("crear usuario con correo tras migración: %v", err)
 	}
@@ -145,16 +145,25 @@ func TestMigrateUserEmail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Email != "akena@ejemplo.com" {
-		t.Fatalf("email = %q, esperado akena@ejemplo.com", got.Email)
+	if got.Email != "akena@ejemplo.com" || got.TelegramID != "123456789" {
+		t.Fatalf("email=%q telegram=%q, esperado akena@ejemplo.com / 123456789", got.Email, got.TelegramID)
 	}
 
 	// correo duplicado → ErrEmailTaken
-	if _, err := s.CreateUser("otro", "hash", RoleCollaborator, "akena@ejemplo.com"); err != ErrEmailTaken {
+	if _, err := s.CreateUser("otro", "hash", RoleCollaborator, "akena@ejemplo.com", ""); err != ErrEmailTaken {
 		t.Fatalf("esperaba ErrEmailTaken, got %v", err)
 	}
 	// correos vacíos no colisionan
-	if _, err := s.CreateUser("sin-correo", "hash", RoleCollaborator, ""); err != nil {
+	if _, err := s.CreateUser("sin-correo", "hash", RoleCollaborator, "", ""); err != nil {
 		t.Fatalf("usuario sin correo: %v", err)
+	}
+
+	// perfil auto-servicio
+	if err := s.UpdateProfile(u.ID, "akena.nueva@ejemplo.com", "-1001234567890"); err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	got2, _ := s.GetUserByID(u.ID)
+	if got2.Email != "akena.nueva@ejemplo.com" || got2.TelegramID != "-1001234567890" {
+		t.Fatalf("perfil tras UpdateProfile: %+v", got2)
 	}
 }

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS users (
 	id            INTEGER PRIMARY KEY AUTOINCREMENT,
 	username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
 	email         TEXT NOT NULL DEFAULT '',
+	telegram_id   TEXT NOT NULL DEFAULT '',
 	password_hash TEXT NOT NULL,
 	role          TEXT NOT NULL DEFAULT 'collaborator',
 	status_title  TEXT NOT NULL DEFAULT 'Estado de los servicios',
@@ -76,6 +77,7 @@ CREATE TABLE IF NOT EXISTS monitors (
 	active           INTEGER NOT NULL DEFAULT 1,
 	public           INTEGER NOT NULL DEFAULT 0,
 	notify           INTEGER NOT NULL DEFAULT 1,
+	notify_owner     INTEGER NOT NULL DEFAULT 0,
 	max_retries      INTEGER NOT NULL DEFAULT 1,
 	created_at       TEXT NOT NULL,
 	updated_at       TEXT NOT NULL
@@ -122,14 +124,18 @@ func (s *Store) migrate() error {
 	if err := s.migrateMonitorsBody(); err != nil {
 		return err
 	}
-	return s.migrateUsersEmail()
+	if err := s.migrateUsersEmail(); err != nil {
+		return err
+	}
+	if err := s.migrateUsersTelegram(); err != nil {
+		return err
+	}
+	return s.migrateMonitorsNotifyOwner()
 }
 
-// migrateUsersEmail añade la columna email a bases de datos creadas con
-// esquemas anteriores y crea el índice único (correos sin duplicados;
-// los vacíos no cuentan).
-func (s *Store) migrateUsersEmail() error {
-	rows, err := s.db.Query("PRAGMA table_info(users)")
+// migraColumna añade una columna TEXT con default ” si no existe.
+func (s *Store) migraColumna(table, column string) error {
+	rows, err := s.db.Query("PRAGMA table_info(" + table + ")")
 	if err != nil {
 		return err
 	}
@@ -142,7 +148,7 @@ func (s *Store) migrateUsersEmail() error {
 			rows.Close()
 			return err
 		}
-		if name == "email" {
+		if name == column {
 			found = true
 		}
 	}
@@ -151,12 +157,50 @@ func (s *Store) migrateUsersEmail() error {
 		return err
 	}
 	if !found {
-		if _, err := s.db.Exec("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''"); err != nil {
+		_, err = s.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " TEXT NOT NULL DEFAULT ''")
+	}
+	return err
+}
+
+// migrateUsersEmail añade la columna email y crea el índice único
+// (correos sin duplicados; los vacíos no cuentan).
+func (s *Store) migrateUsersEmail() error {
+	if err := s.migraColumna("users", "email"); err != nil {
+		return err
+	}
+	_, err := s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email <> ''")
+	return err
+}
+
+func (s *Store) migrateUsersTelegram() error {
+	return s.migraColumna("users", "telegram_id")
+}
+
+func (s *Store) migrateMonitorsNotifyOwner() error {
+	rows, err := s.db.Query("PRAGMA table_info(monitors)")
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
 			return err
 		}
+		if name == "notify_owner" {
+			found = true
+		}
 	}
-	// índice único parcial: solo cuenta cuando el correo no está vacío
-	_, err = s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email <> ''")
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !found {
+		_, err = s.db.Exec("ALTER TABLE monitors ADD COLUMN notify_owner INTEGER NOT NULL DEFAULT 0")
+	}
 	return err
 }
 
