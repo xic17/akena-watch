@@ -175,7 +175,9 @@ Cada monitor se define con:
 
 - **Nombre** y **tipo**: `http` (URL completa), `tcp` (host:puerto), `dns` (host).
 - **HTTP**: método, estado esperado (default 200), palabra clave opcional
-  (buscar en el cuerpo, o alertar si *aparece* con "invertir keyword").
+  (buscar en el cuerpo, o alertar si *aparece* con "invertir keyword") y
+  **cuerpo JSON opcional** que se envía en cada check (para APIs con
+  POST/PUT/PATCH; se manda con `Content-Type: application/json`).
 - **Intervalo**: desde 10 segundos hasta 24 horas.
 - **Timeout**: 1–120 segundos.
 - **Reintentos**: N fallos consecutivos antes de disparar la alerta (default 1).

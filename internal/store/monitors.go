@@ -23,6 +23,7 @@ type Monitor struct {
 	Method         string
 	ExpectedStatus int
 	Keyword        string
+	Body           string // cuerpo JSON opcional para checks HTTP
 	InvertKeyword  bool
 	TimeoutS       int
 	IntervalS      int
@@ -53,10 +54,10 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	now := nowStr()
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, type, url, method, expected_status, keyword,
-		 invert_keyword, timeout_s, interval_s, active, public, notify, max_retries, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 body, invert_keyword, timeout_s, interval_s, active, public, notify, max_retries, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
-		boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
+		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), m.MaxRetries, now, now)
 	if err != nil {
 		return Monitor{}, err
@@ -71,10 +72,10 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
-		 invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, max_retries=?, updated_at=?
+		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, max_retries=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
-		boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
+		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), m.MaxRetries, nowStr(), m.ID)
 	return err
 }
@@ -283,7 +284,7 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 // --- helpers de columnas ---
 
 const monitorCols = `m.id, m.owner_id, m.name, m.type, m.url, m.method, m.expected_status,
-	m.keyword, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
+	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
 	m.max_retries, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
@@ -291,7 +292,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	var inv, act, pub, not int
 	var createdAt, updatedAt string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
-		&m.Keyword, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
+		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
 		&createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
@@ -319,7 +320,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var createdAt, updatedAt string
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
-		&m.Keyword, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
+		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &m.MaxRetries,
 		&createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound

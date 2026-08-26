@@ -21,6 +21,7 @@ type monitorInput struct {
 	Method         string  `json:"method"`
 	ExpectedStatus int     `json:"expected_status"`
 	Keyword        string  `json:"keyword"`
+	Body           string  `json:"body"`
 	InvertKeyword  bool    `json:"invert_keyword"`
 	TimeoutS       int     `json:"timeout_s"`
 	IntervalS      int     `json:"interval_s"`
@@ -40,6 +41,7 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		Method:         strings.ToUpper(strings.TrimSpace(in.Method)),
 		ExpectedStatus: in.ExpectedStatus,
 		Keyword:        in.Keyword,
+		Body:           in.Body,
 		InvertKeyword:  in.InvertKeyword,
 		TimeoutS:       in.TimeoutS,
 		IntervalS:      in.IntervalS,
@@ -88,6 +90,9 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		if m.URL == "" {
 			return m, errors.New("el destino no puede estar vacío")
 		}
+		if m.Body != "" {
+			return m, errors.New("el cuerpo JSON solo aplica a monitores HTTP")
+		}
 	default:
 		return m, errors.New("tipo de monitor no válido (http, tcp o dns)")
 	}
@@ -114,8 +119,9 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 	p := map[string]any{
 		"id": m.ID, "owner_id": m.OwnerID, "owner": m.OwnerName, "name": m.Name,
 		"type": m.Type, "url": m.URL, "method": m.Method,
-		"expected_status": m.ExpectedStatus, "keyword": m.Keyword, "invert_keyword": m.InvertKeyword,
-		"timeout_s": m.TimeoutS, "interval_s": m.IntervalS,
+		"expected_status": m.ExpectedStatus, "keyword": m.Keyword, "body": m.Body,
+		"invert_keyword": m.InvertKeyword,
+		"timeout_s":      m.TimeoutS, "interval_s": m.IntervalS,
 		"active": m.Active, "public": m.Public, "notify": m.Notify, "max_retries": m.MaxRetries,
 	}
 
@@ -260,7 +266,8 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	// conserva identidad y propiedad
 	cur.Name, cur.Type, cur.URL = nm.Name, nm.Type, nm.URL
 	cur.Method, cur.ExpectedStatus, cur.Keyword = nm.Method, nm.ExpectedStatus, nm.Keyword
-	cur.InvertKeyword, cur.TimeoutS, cur.IntervalS = nm.InvertKeyword, nm.TimeoutS, nm.IntervalS
+	cur.Body, cur.InvertKeyword = nm.Body, nm.InvertKeyword
+	cur.TimeoutS, cur.IntervalS = nm.TimeoutS, nm.IntervalS
 	cur.Active, cur.Public, cur.Notify, cur.MaxRetries = nm.Active, nm.Public, nm.Notify, nm.MaxRetries
 
 	if err := s.st.UpdateMonitor(cur); err != nil {

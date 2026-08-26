@@ -478,7 +478,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, public: false, invert_keyword: false, notifier_ids: [] };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, public: false, invert_keyword: false, body: "", notifier_ids: [] };
     const shares = (m && m.shares) || [];
     const notifBoxes = NOTIFS.map((n) =>
       `<label class="check-row"><input type="checkbox" name="notif" value="${n.id}" ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span></label>`).join("") || '<p class="field-note">No hay canales. Créalos en "Canales de alerta".</p>';
@@ -533,6 +533,10 @@ if (document.getElementById("monitor-list")) {
             <label>Palabra clave (opcional)
               <input name="keyword" value="${esc(f.keyword || "")}" placeholder="buscar en la respuesta">
             </label>
+            <label>Cuerpo JSON (opcional)
+              <textarea name="body" rows="4" spellcheck="false" placeholder='{"query": "estado"}'>${esc(f.body || "")}</textarea>
+            </label>
+            <p class="field-note">Se envía con Content-Type: application/json (útil con POST/PUT/PATCH).</p>
             <label class="check-row"><input type="checkbox" name="invert_keyword" ${f.invert_keyword ? "checked" : ""}> Alertar si la palabra clave SÍ aparece</label>
           </div>
           <div>
@@ -586,6 +590,7 @@ if (document.getElementById("monitor-list")) {
         method: fd.get("method") || "GET",
         expected_status: parseInt(fd.get("expected_status") || "200", 10),
         keyword: fd.get("keyword") || "",
+        body: fd.get("body") || "",
         invert_keyword: fd.get("invert_keyword") === "on",
         timeout_s: parseInt(fd.get("timeout_s"), 10),
         interval_s: parseInt(fd.get("interval_s"), 10),

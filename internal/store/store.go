@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS monitors (
 	method           TEXT NOT NULL DEFAULT 'GET',
 	expected_status  INTEGER NOT NULL DEFAULT 200,
 	keyword          TEXT NOT NULL DEFAULT '',
+	body             TEXT NOT NULL DEFAULT '',
 	invert_keyword   INTEGER NOT NULL DEFAULT 0,
 	timeout_s        INTEGER NOT NULL DEFAULT 10,
 	interval_s       INTEGER NOT NULL DEFAULT 60,
@@ -114,7 +115,36 @@ CREATE TABLE IF NOT EXISTS monitor_notifiers (
 `
 
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(schema)
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	return s.migrateMonitorsBody()
+}
+
+// migrateMonitorsBody añade la columna body (cuerpo JSON de los checks
+// HTTP) a bases de datos creadas con esquemas anteriores.
+func (s *Store) migrateMonitorsBody() error {
+	rows, err := s.db.Query("PRAGMA table_info(monitors)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "body" {
+			return nil // ya migrada
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = s.db.Exec("ALTER TABLE monitors ADD COLUMN body TEXT NOT NULL DEFAULT ''")
 	return err
 }
 

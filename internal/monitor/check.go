@@ -39,11 +39,18 @@ func Check(ctx context.Context, m store.Monitor) Result {
 }
 
 func checkHTTP(ctx context.Context, m store.Monitor) Result {
-	req, err := http.NewRequestWithContext(ctx, m.Method, m.URL, nil)
+	var payload io.Reader
+	if m.Body != "" {
+		payload = strings.NewReader(m.Body)
+	}
+	req, err := http.NewRequestWithContext(ctx, m.Method, m.URL, payload)
 	if err != nil {
 		return Result{Status: store.StatusDown, Error: "URL inválida: " + err.Error()}
 	}
 	req.Header.Set("User-Agent", "akena-watch/1.0 (Siempre en Guardia)")
+	if m.Body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	client := &http.Client{
 		Timeout: time.Duration(m.TimeoutS) * time.Second,
