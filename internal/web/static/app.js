@@ -57,8 +57,15 @@ function toast(msg, kind = "ok") {
 
 // --- modal ---
 function openModal(html, wide) {
-  const root = $("#modal-root");
-  if (!root) return;
+  // Si la página no define #modal-root (p. ej. Herramientas o Acerca de),
+  // lo creamos sobre la marcha, igual que toast(): así el botón Perfil
+  // funciona en cualquier página sin depender de la plantilla.
+  let root = $("#modal-root");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "modal-root";
+    document.body.appendChild(root);
+  }
   root.innerHTML =
     '<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">' +
     '<div class="modal card' + (wide ? " wide" : "") + '">' + html + "</div></div>";

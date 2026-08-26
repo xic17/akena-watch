@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{block "title" .}}Akena Watch{{end}} · Akena Watch</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%23f59e0b'/%3E%3Cg%20fill='%2317130a'%3E%3Cellipse%20cx='15.5'%20cy='29'%20rx='4.8'%20ry='8.2'%20transform='rotate(-35%2015.5%2029)'/%3E%3Cellipse%20cx='26'%20cy='17.5'%20rx='4.8'%20ry='8'%20transform='rotate(-12%2026%2017.5)'/%3E%3Cellipse%20cx='38'%20cy='17.5'%20rx='4.8'%20ry='8'%20transform='rotate(12%2038%2017.5)'/%3E%3Cellipse%20cx='48.5'%20cy='29'%20rx='4.8'%20ry='8.2'%20transform='rotate(35%2048.5%2029)'/%3E%3Cpath%20d='M32%2035%20C29.5%2032.5%2026%2033%2024.5%2036%20C21.5%2036.5%2019%2039.5%2019.2%2043.5%20C19.5%2049.5%2025%2055.5%2032%2055.5%20C39%2055.5%2044.5%2049.5%2044.8%2043.5%20C45%2039.5%2042.5%2036.5%2039.5%2036%20C38%2033%2034.5%2032.5%2032%2035Z'/%3E%3C/g%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v={{.Version}}">
 </head>
 <body>
   {{if .User}}
@@ -38,7 +38,7 @@
     <span>Siempre en Guardia — en memoria de Akena · v{{.Version}}</span>
   </footer>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{.Version}}"></script>
 </body>
 </html>
 
