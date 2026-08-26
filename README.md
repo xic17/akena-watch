@@ -1,8 +1,10 @@
 # Akena Watch — Siempre en Guardia
 
-Monitor de disponibilidad (uptime) **portable**: un solo binario, SQLite embebida,
-cero dependencias de runtime. Corre en **cualquier Linux**, detrás de un panel
-como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutable.
+Monitor de disponibilidad (uptime) en **un solo binario estático** — sin Docker,
+sin Node, sin instalaciones. Cópialo en **cualquier Linux**, ejecútalo y olvídate:
+vigila tus servicios, guarda el historial en SQLite embebida y avisa cuando algo
+falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o en
+**Cloudflare Containers**.
 
 > 🌐 **Sitio web y descargas**: <https://akenawatch.com> — landing,
 > enlaces a los binarios de cada release y documentación base.
