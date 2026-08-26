@@ -4,7 +4,7 @@ Monitor de disponibilidad (uptime) **portable**: un solo binario, SQLite embebid
 cero dependencias de runtime. Corre en **cualquier Linux**, detrás de un panel
 como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutable.
 
-> 🌐 **Sitio web y descargas**: <https://xic17.github.io/akena-watch/> — landing,
+> 🌐 **Sitio web y descargas**: <https://akenawatch.com> — landing,
 > enlaces a los binarios de cada release y documentación base.
 
 > 🐾 **En memoria de Akena.** Este proyecto nace como tributo a una compañera
