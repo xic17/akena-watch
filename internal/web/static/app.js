@@ -933,7 +933,7 @@ if (document.getElementById("user-list")) {
 // --- herramientas: pestañas ---
 const toolsTabs = document.getElementById("tools-tabs");
 if (toolsTabs) {
-  const panels = { ping: "tab-ping", whois: "tab-whois" };
+  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns" };
   const saved = localStorage.getItem("akena_tool_tab");
   const switchTab = (name) => {
     $$(".tab", toolsTabs).forEach((b) => {
@@ -1142,6 +1142,39 @@ if (whoisTool) {
       toast("Texto WHOIS copiado");
     } catch {
       toast("No se pudo copiar", "bad");
+    }
+  });
+}
+
+// --- herramientas: dns lookup ---
+const dnsTool = document.getElementById("dns-tool");
+if (dnsTool) {
+  const $df = (id) => document.getElementById(id);
+  $df("dns-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const host = fd.get("host").trim();
+    const type = fd.get("type");
+    const btn = $df("dns-btn");
+    btn.disabled = true;
+    btn.textContent = "Consultando…";
+    $df("dns-error").classList.add("hidden");
+    $df("dns-result").classList.add("hidden");
+    try {
+      const res = await api("/api/dns?host=" + encodeURIComponent(host) + "&type=" + encodeURIComponent(type));
+      $df("dns-meta").textContent = res.records.length
+        ? `${res.records.length} registro(s) ${res.type} de ${res.host} · ${res.elapsed_ms} ms`
+        : `Sin registros ${res.type} para ${res.host} (el host existe) · ${res.elapsed_ms} ms`;
+      $df("dns-rows").innerHTML = res.records.map((r) =>
+        `<tr><td><span class="badge">${esc(r.type)}</span></td><td>${esc(r.value)}</td></tr>`).join("");
+      $df("dns-result").classList.remove("hidden");
+    } catch (err) {
+      const box = $df("dns-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Consultar";
     }
   });
 }

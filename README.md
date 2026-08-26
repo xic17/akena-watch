@@ -59,8 +59,8 @@ como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutabl
 - **Alertas** por webhook genérico, **Telegram** y **email SMTP**, con botón de
   **prueba por canal** para validar la configuración.
 - **Herramientas**: sección de utilidades que se ejecutan desde el servidor —
-  **ping en tiempo real** (TCP por defecto o ICMP con permisos, con estadísticas,
-  gráfica y log) y **whois** (dominios e IPs, con botón de copiar).
+  **ping en tiempo real** (TCP o ICMP, con estadísticas y gráfica), **whois**
+  y **DNS lookup** (A, AAAA, CNAME, MX, NS, TXT, PTR).
 - **Página de estado pública** por usuario, sin autenticación, con **historial
   visual de las últimas 24 horas** por monitor.
 - **Un solo binario**: el frontend está embebido (`go:embed`); no hay
@@ -274,6 +274,23 @@ Consulta el registro WHOIS de un **dominio o IP** desde el servidor
 registrador resuelta automáticamente. Muestra el texto completo del registro
 en una vista desplazable, con botón para copiarlo, y timeout de 20 segundos.
 
+### DNS Lookup
+
+Consulta los registros DNS de un host desde el servidor
+(`GET /api/dns?host=...&type=...`) usando el resolver del sistema:
+
+| Tipo | Descripción |
+|---|---|
+| `A` / `AAAA` | Direcciones IPv4 / IPv6 |
+| `CNAME` | Nombre canónico |
+| `MX` | Servidores de correo (preferencia incluida) |
+| `NS` | Servidores de nombres |
+| `TXT` | Texto (SPF, verificaciones, …) |
+| `PTR` | Resolución inversa (indica una IP) |
+
+Muestra los registros en una tabla con el tiempo de consulta, distingue
+"host inexistente" de "sin registros de ese tipo", y tolera URLs pegadas.
+
 ## Configuración
 
 Todo se configura con variables de entorno — el binario es agnóstico de plataforma:
@@ -456,6 +473,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET` | `/ws` | sesión (cookie o `?token=`) | WebSocket de tiempo real |
 | `GET` | `/ws/ping` | sesión (cookie o `?token=`) | Herramienta de ping en tiempo real (mensajes JSON) |
 | `GET` | `/api/whois?domain=...` | sesión | Registro WHOIS de un dominio o IP |
+| `GET` | `/api/dns?host=...&type=...` | sesión | Registros DNS (A, AAAA, CNAME, MX, NS, TXT, PTR) |
 
 ## Seguridad
 
@@ -531,7 +549,7 @@ akena-watch/
 - 2FA (TOTP) para cuentas administrador.
 - Adaptador de persistencia sobre D1 (Cloudflare) sin tocar el resto del código.
 - Notificaciones adicionales: Discord, Slack, Pushover, ntfysh.
-- Más herramientas: DNS lookup, inspección HTTP (headers/certificados), traceroute.
+- Más herramientas: inspección HTTP (headers/certificados), traceroute.
 - Exportación de datos (heartbeats y configuración).
 
 ## Licencia
