@@ -449,6 +449,8 @@ textarea { resize: vertical; min-height: 70px; }
 .status-head h1 { margin: 10px 0 4px; font-size: 24px; }
 .status-head p { margin: 0; }
 .status-foot { text-align: center; margin-top: 16px; }
+.status-foot-paw { display: inline-flex; vertical-align: middle; margin-right: 4px; }
+.status-foot-paw .paw { width: 14px; height: 14px; color: var(--amber); opacity: 0.8; }
 
 /* --- Acerca de (homenaje) --- */
 .about { max-width: 640px; margin: 0 auto; }
