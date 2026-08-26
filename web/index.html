@@ -140,10 +140,16 @@
               esperando a que lo explores.
             </p>
             <div class="demo-creds">
-              <span class="cred"><span class="cred-label">usuario</span><code id="demo-user">akena</code></span>
-              <span class="cred-sep">·</span>
-              <span class="cred"><span class="cred-label">contraseña</span><code id="demo-pass">Demo2026!Secure</code></span>
-              <button class="btn tiny" type="button" onclick="copyCreds()">Copiar</button>
+              <div class="cred">
+                <span class="cred-label">usuario</span>
+                <code id="demo-user">akena</code>
+                <button class="btn tiny" type="button" onclick="copyCred('demo-user', this)">Copiar</button>
+              </div>
+              <div class="cred">
+                <span class="cred-label">contraseña</span>
+                <code id="demo-pass">Demo2026!Secure</code>
+                <button class="btn tiny" type="button" onclick="copyCred('demo-pass', this)">Copiar</button>
+              </div>
             </div>
             <a class="btn" href="https://demos.akenawatch.com" target="_blank" rel="noopener">Abrir dashboard →</a>
           </div>
@@ -327,18 +333,13 @@ curl -sSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/insta
       setTimeout(() => el.classList.remove("copied"), 1500);
     }).catch(() => {});
   }
-  function copyCreds() {
-    const user = document.getElementById("demo-user");
-    const pass = document.getElementById("demo-pass");
-    if (!user || !pass) return;
-    const text = user.textContent.trim() + " / " + pass.textContent.trim();
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = document.querySelector(".demo-creds .btn");
-      if (btn) {
-        const old = btn.textContent;
-        btn.textContent = "Copiado ✓";
-        setTimeout(() => { btn.textContent = old; }, 1500);
-      }
+  function copyCred(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+      const old = btn.textContent;
+      btn.textContent = "Copiado ✓";
+      setTimeout(() => { btn.textContent = old; }, 1500);
     }).catch(() => {});
   }
   </script>

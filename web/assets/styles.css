@@ -242,9 +242,8 @@ tr:last-child td { border-bottom: none; }
 .demo-desc { margin: 0; color: var(--muted); font-size: 14.5px; }
 .demo-creds {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   background: var(--panel-2);
   border: 1px solid var(--border);
@@ -252,11 +251,10 @@ tr:last-child td { border-bottom: none; }
   padding: 10px 12px;
   font-size: 13.5px;
 }
-.cred { display: inline-flex; align-items: center; gap: 6px; }
-.cred-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-.cred code { background: none; border: none; padding: 0; color: var(--amber-strong); }
-.cred-sep { color: var(--border); }
-.demo-creds .btn { margin-left: auto; }
+.cred { display: flex; align-items: center; gap: 8px; width: 100%; }
+.cred-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; min-width: 84px; }
+.cred code { background: none; border: none; padding: 0; color: var(--amber-strong); flex: 1; word-break: break-all; }
+.cred .btn { flex: none; }
 
 /* --- Tributo --- */
 .tribute {
