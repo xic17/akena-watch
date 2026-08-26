@@ -198,6 +198,66 @@ tr:last-child td { border-bottom: none; }
 }
 .donate-note strong { color: var(--amber-strong); }
 
+/* --- Demo en vivo --- */
+.demo-card { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.demo-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.demo-head .paw { width: 30px; height: 30px; color: var(--amber); }
+.demo-head h3 { margin: 0; font-size: 18px; flex: 1; }
+.live {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+}
+.mini-history { display: flex; gap: 3px; }
+.mini-history .h {
+  width: 10px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.mini-history .h.up { background: var(--green); border-color: transparent; }
+.mini-history .h.down { background: var(--red); border-color: transparent; }
+.demo-desc { margin: 0; color: var(--muted); font-size: 14.5px; }
+.demo-creds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13.5px;
+}
+.cred { display: inline-flex; align-items: center; gap: 6px; }
+.cred-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.cred code { background: none; border: none; padding: 0; color: var(--amber-strong); }
+.cred-sep { color: var(--border); }
+.demo-creds .btn { margin-left: auto; }
+
 /* --- Tributo --- */
 .tribute {
   text-align: center;
