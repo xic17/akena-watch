@@ -6,6 +6,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Permite lanzar la release manualmente si GitHub se traga el evento del tag:
+  #   gh workflow run Release --ref v1.0.4
+  workflow_dispatch:
 
 permissions:
   contents: write
