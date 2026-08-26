@@ -57,6 +57,9 @@ como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutabl
   (estado, latencia, gráfica y resumen).
 - **Alertas** por webhook genérico, **Telegram** y **email SMTP**, con botón de
   **prueba por canal** para validar la configuración.
+- **Herramientas**: sección de utilidades que se ejecutan desde el servidor —
+  por ahora, **ping en tiempo real** (TCP por defecto o ICMP con permisos),
+  con estadísticas en vivo (mín/media/máx, pérdida), gráfica y log por paquete.
 - **Página de estado pública** por usuario, sin autenticación, con **historial
   visual de las últimas 24 horas** por monitor.
 - **Un solo binario**: el frontend está embebido (`go:embed`); no hay
@@ -412,6 +415,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET` | `/ping` | público | Health check (keep-alive Cloudflare) |
 | `GET` | `/api/version` | público | Nombre y versión del binario |
 | `GET` | `/ws` | sesión (cookie o `?token=`) | WebSocket de tiempo real |
+| `GET` | `/ws/ping` | sesión (cookie o `?token=`) | Herramienta de ping en tiempo real (mensajes JSON) |
 
 ## Seguridad
 
@@ -466,6 +470,7 @@ akena-watch/
 │   ├── store/                  # SQLite: usuarios, monitores, heartbeats, canales
 │   ├── monitor/                # checks (http/tcp/dns) + scheduler
 │   ├── notifier/               # webhook, telegram, smtp
+│   ├── ping/                   # motor de ping TCP/ICMP (herramientas)
 │   ├── server/                 # rutas, auth, hub WebSocket, handlers
 │   └── web/                    # templates + estáticos embebidos
 ├── deploy/
@@ -485,7 +490,7 @@ akena-watch/
 - 2FA (TOTP) para cuentas administrador.
 - Adaptador de persistencia sobre D1 (Cloudflare) sin tocar el resto del código.
 - Notificaciones adicionales: Discord, Slack, Pushover, ntfysh.
-- Checks ICMP cuando el entorno lo permita (VPS con sockets crudos).
+- Más herramientas: DNS lookup, inspección HTTP (headers/certificados), traceroute.
 - Exportación de datos (heartbeats y configuración).
 
 ## Licencia

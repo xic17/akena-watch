@@ -929,3 +929,142 @@ if (document.getElementById("user-list")) {
 
   loadUsers();
 }
+
+// --- herramientas: ping en tiempo real ---
+const pingTool = document.getElementById("ping-tool");
+if (pingTool) {
+  const $f = (id) => document.getElementById(id);
+  let pingWS = null;
+  let pingPending = null;
+  let pingPoints = []; // latencias para la gráfica (null = pérdida)
+  let pingStats = { sent: 0, received: 0, lost: 0, min: 0, max: 0, sum: 0 };
+
+  function connectPingWS() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    pingWS = new WebSocket(`${proto}://${location.host}/ws/ping`);
+    pingWS.onopen = () => {
+      if (pingPending) {
+        pingWS.send(JSON.stringify(pingPending));
+        pingPending = null;
+      }
+    };
+    pingWS.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === "result") onPingResult(msg);
+      else if (msg.type === "done") stopPingUI(true);
+      else if (msg.type === "error") { toast(msg.error, "bad"); stopPingUI(false); }
+    };
+    pingWS.onclose = () => setTimeout(connectPingWS, 2000);
+  }
+
+  function onPingResult(r) {
+    pingStats.sent++;
+    if (r.ok) {
+      pingStats.received++;
+      pingStats.sum += r.latency_ms;
+      if (!pingStats.min || r.latency_ms < pingStats.min) pingStats.min = r.latency_ms;
+      if (r.latency_ms > pingStats.max) pingStats.max = r.latency_ms;
+      pingPoints.push(r.latency_ms);
+    } else {
+      pingStats.lost++;
+      pingPoints.push(null);
+    }
+    if (pingPoints.length > 120) pingPoints.shift();
+    renderPingStats();
+    renderPingChart();
+    prependPingLog(r);
+  }
+
+  function renderPingStats() {
+    const loss = pingStats.sent ? Math.round((pingStats.lost / pingStats.sent) * 100) : 0;
+    $f("ps-sent").textContent = pingStats.sent;
+    $f("ps-recv").textContent = pingStats.received;
+    $f("ps-lost").textContent = pingStats.lost;
+    $f("ps-loss").textContent = loss + "%";
+    $f("ps-min").textContent = pingStats.min ? pingStats.min + " ms" : "—";
+    $f("ps-avg").textContent = pingStats.received ? Math.round(pingStats.sum / pingStats.received) + " ms" : "—";
+    $f("ps-max").textContent = pingStats.max ? pingStats.max + " ms" : "—";
+  }
+
+  function renderPingChart() {
+    const el = $f("ping-chart");
+    if (!el) return;
+    $f("ping-chart-wrap").classList.remove("hidden");
+    const w = 480, h = 80;
+    const vals = pingPoints.filter((p) => p !== null);
+    if (!vals.length) { el.innerHTML = ""; return; }
+    const maxLat = Math.max(200, ...vals);
+    const n = pingPoints.length;
+    const x = (i) => (n === 1 ? w / 2 : (i / (n - 1)) * w);
+    const y = (v) => h - 6 - Math.min(1, v / maxLat) * (h - 16);
+    let d = "";
+    let startNew = true;
+    pingPoints.forEach((v, i) => {
+      if (v === null) { startNew = true; return; }
+      d += (startNew ? "M" : "L") + x(i).toFixed(1) + " " + y(v).toFixed(1);
+      startNew = false;
+    });
+    const lost = pingPoints.map((v, i) =>
+      v === null ? `<circle cx="${x(i).toFixed(1)}" cy="${h - 6}" r="2.2" fill="var(--red)"/>` : "").join("");
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="spark" aria-hidden="true">
+      ${d ? `<path d="${d}" fill="none" stroke="var(--amber-strong)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ""}${lost}</svg>`;
+  }
+
+  function prependPingLog(r) {
+    const log = $f("ping-log");
+    const div = document.createElement("div");
+    div.className = "ping-line " + (r.ok ? "ok" : "bad");
+    div.innerHTML = `<span class="muted">#${r.seq}</span>` +
+      (r.ok ? `<span class="up-text">${fmtLat(r.latency_ms)}</span>` : `<span class="error-text">fallo</span>`) +
+      `<span class="muted small">${esc(r.error || "")}</span>`;
+    log.prepend(div);
+    while (log.children.length > 100) log.lastChild.remove();
+  }
+
+  function stopPingUI(final) {
+    $f("ping-start").disabled = false;
+    $f("ping-stop").disabled = true;
+    if (final) toast("Ping finalizado");
+  }
+
+  const pingForm = $f("ping-form");
+  const portLabel = $f("ping-port").closest("label");
+  const protoSel = $("select[name='proto']", pingForm);
+  const togglePort = () => portLabel.classList.toggle("hidden", protoSel.value !== "tcp");
+  protoSel.addEventListener("change", togglePort);
+
+  pingForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(pingForm);
+    pingPending = {
+      type: "start",
+      host: fd.get("host").trim(),
+      proto: fd.get("proto"),
+      port: parseInt(fd.get("port") || "443", 10),
+      interval_ms: parseInt(fd.get("interval"), 10),
+      count: parseInt(fd.get("count") || "0", 10),
+    };
+    pingStats = { sent: 0, received: 0, lost: 0, min: 0, max: 0, sum: 0 };
+    pingPoints = [];
+    $f("ping-log").innerHTML = "";
+    $f("ping-stats").classList.remove("hidden");
+    $f("ping-chart-wrap").classList.add("hidden");
+    renderPingStats();
+    $f("ping-start").disabled = true;
+    $f("ping-stop").disabled = false;
+    if (!pingWS || pingWS.readyState !== WebSocket.OPEN) {
+      connectPingWS(); // enviará pingPending cuando el socket abra
+    } else {
+      pingWS.send(JSON.stringify(pingPending));
+      pingPending = null;
+    }
+  });
+
+  $f("ping-stop").addEventListener("click", () => {
+    if (pingWS && pingWS.readyState === WebSocket.OPEN) pingWS.send(JSON.stringify({ type: "stop" }));
+    stopPingUI(false);
+  });
+
+  connectPingWS();
+}

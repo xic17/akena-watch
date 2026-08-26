@@ -30,7 +30,7 @@ func New(st *store.Store, hub *Hub, notify *notifier.Manager, version string) *S
 	base := template.Must(template.ParseFS(web.FS, "templates/base.html"))
 	pages := make(map[string]*template.Template, 6)
 	for _, name := range []string{
-		"setup.html", "login.html", "dashboard.html", "users.html", "about.html", "status.html",
+		"setup.html", "login.html", "dashboard.html", "tools.html", "users.html", "about.html", "status.html",
 	} {
 		pages[name] = template.Must(base.Clone())
 		template.Must(pages[name].ParseFS(web.FS, "templates/"+name))
@@ -47,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /setup", s.handleSetupPage)
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("GET /dashboard", s.authPage(s.handleDashboard))
+	mux.HandleFunc("GET /tools", s.authPage(s.handleToolsPage))
 	mux.HandleFunc("GET /users", s.authPage(s.adminPage(s.handleUsersPage)))
 	mux.HandleFunc("GET /about", s.handleAboutPage)
 	mux.HandleFunc("GET /status/{slug}", s.handleStatusPage)
@@ -58,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ping", s.handlePing)
 	mux.HandleFunc("GET /api/version", s.handleVersion)
 	mux.HandleFunc("GET /ws", s.handleWS)
+	mux.HandleFunc("GET /ws/ping", s.handlePingWS)
 
 	// API autenticada
 	mux.HandleFunc("GET /api/me", s.authJSON(s.handleMe))

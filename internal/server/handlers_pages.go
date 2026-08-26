@@ -73,6 +73,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "dashboard.html", pageData{User: u, IsAdmin: u.IsAdmin(), Username: u.Username})
 }
 
+func (s *Server) handleToolsPage(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	s.render(w, "tools.html", pageData{User: u, IsAdmin: u.IsAdmin(), Username: u.Username})
+}
+
 func (s *Server) handleUsersPage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	s.render(w, "users.html", pageData{User: u, IsAdmin: true, Username: u.Username})

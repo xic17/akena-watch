@@ -332,6 +332,8 @@ textarea { resize: vertical; min-height: 70px; }
   padding: 10px;
   margin-top: 4px;
 }
+.chart-wrap.hidden { display: none; }
+.chart-wrap:not(.hidden) { display: block; }
 .chart-wrap svg { width: 100%; height: auto; display: block; }
 .chart-range { display: flex; gap: 6px; margin: 8px 0 4px; }
 .chart-range .btn.active {
@@ -345,6 +347,44 @@ textarea { resize: vertical; min-height: 70px; }
 .events-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 .events-table tr:last-child td { border-bottom: none; }
 .up-text { color: var(--green); }
+
+/* --- Herramientas --- */
+.tool-card { padding: 24px; }
+.tool-head h2 { margin: 0 0 2px; font-size: 19px; }
+.tool-head p { margin: 0 0 14px; }
+.tool-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0 14px;
+  align-items: end;
+}
+.tool-form label { margin: 0 0 6px; }
+.tool-actions { display: flex; gap: 8px; align-items: end; margin-top: 14px; }
+.tool-actions .btn { margin-top: 4px; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 18px 0 12px;
+}
+.ping-log {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.ping-line {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.ping-line.bad { color: var(--red); }
+@media (max-width: 720px) {
+  .tool-actions { grid-column: 1 / -1; }
+}
 
 /* --- Usuarios --- */
 .user-table { width: 100%; border-collapse: collapse; }
