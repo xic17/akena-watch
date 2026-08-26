@@ -938,6 +938,7 @@ if (pingTool) {
   let pingPending = null;
   let pingPoints = []; // latencias para la gráfica (null = pérdida)
   let pingStats = { sent: 0, received: 0, lost: 0, min: 0, max: 0, sum: 0 };
+  let pingErrorShown = false;
 
   function connectPingWS() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -974,6 +975,18 @@ if (pingTool) {
     renderPingStats();
     renderPingChart();
     prependPingLog(r);
+    // error permanente (p. ej. ICMP sin permisos): detener con un solo aviso
+    if (r.fatal) {
+      showPingError(r.error);
+      stopPingUI(false);
+    }
+  }
+
+  function showPingError(text) {
+    const box = $f("ping-error");
+    box.textContent = "⚠️ " + text;
+    box.classList.remove("hidden");
+    pingErrorShown = true;
   }
 
   function renderPingStats() {
@@ -1025,7 +1038,7 @@ if (pingTool) {
   function stopPingUI(final) {
     $f("ping-start").disabled = false;
     $f("ping-stop").disabled = true;
-    if (final) toast("Ping finalizado");
+    if (final && !pingErrorShown) toast("Ping finalizado");
   }
 
   const pingForm = $f("ping-form");
@@ -1047,6 +1060,8 @@ if (pingTool) {
     };
     pingStats = { sent: 0, received: 0, lost: 0, min: 0, max: 0, sum: 0 };
     pingPoints = [];
+    pingErrorShown = false;
+    $f("ping-error").classList.add("hidden");
     $f("ping-log").innerHTML = "";
     $f("ping-stats").classList.remove("hidden");
     $f("ping-chart-wrap").classList.add("hidden");

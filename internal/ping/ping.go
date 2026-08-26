@@ -35,6 +35,7 @@ type Result struct {
 	OK        bool
 	LatencyMS int
 	Error     string
+	Fatal     bool // el error es permanente (p. ej. sin permisos): detiene la sesión
 }
 
 // Run ejecuta la sesión hasta agotar Count o hasta que ctx se cancele.
@@ -50,7 +51,11 @@ func (c Config) Run(ctx context.Context, send func(Result)) {
 		if c.Count > 0 && seq > c.Count {
 			return
 		}
-		send(c.ping(ctx, seq))
+		res := c.ping(ctx, seq)
+		send(res)
+		if res.Fatal {
+			return // el error es permanente: no tiene sentido seguir
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -84,8 +89,9 @@ func tcpPing(ctx context.Context, host string, port, seq int) Result {
 func icmpPing(ctx context.Context, host string, seq int) Result {
 	conn, err := icmp.ListenPacket("udp4", "0.0.0.0")
 	if err != nil {
-		return Result{Seq: seq, OK: false,
-			Error: "ICMP no disponible: " + err.Error() + " (usa TCP o ejecuta con permisos)"}
+		return Result{Seq: seq, OK: false, Fatal: true,
+			Error: "ICMP no disponible (permisos): " + err.Error() +
+				". Usa el tipo TCP o habilita los permisos de ping en el servidor."}
 	}
 	defer conn.Close()
 

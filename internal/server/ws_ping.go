@@ -76,7 +76,7 @@ func (s *Server) handlePingWS(w http.ResponseWriter, r *http.Request) {
 				}
 				send(map[string]any{
 					"type": "result", "seq": res.Seq, "ok": res.OK,
-					"latency_ms": res.LatencyMS, "error": res.Error,
+					"latency_ms": res.LatencyMS, "error": res.Error, "fatal": res.Fatal,
 				})
 			})
 

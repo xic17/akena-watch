@@ -382,6 +382,15 @@ textarea { resize: vertical; min-height: 70px; }
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .ping-line.bad { color: var(--red); }
+.error-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--red);
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--red);
+  font-size: 14px;
+}
 @media (max-width: 720px) {
   .tool-actions { grid-column: 1 / -1; }
 }
