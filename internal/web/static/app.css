@@ -192,7 +192,7 @@ textarea { resize: vertical; min-height: 70px; }
   transition: all 0.15s ease;
   white-space: nowrap;
 }
-.btn:hover { border-color: var(--amber); color: var(--amber-strong); }
+.btn:hover { border-color: var(--amber); color: var(--amber-strong); text-decoration: none; }
 .btn.primary { background: var(--amber); border-color: var(--amber); color: #17130a; font-weight: 600; }
 .btn.primary:hover { background: var(--amber-strong); color: #17130a; }
 .btn.danger:hover { border-color: var(--red); color: var(--red); }
