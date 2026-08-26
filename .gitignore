@@ -1,6 +1,8 @@
 bin/
 dist/
 data/
+.test-data/
+Makefile.local
 *.db
 *.db-wal
 *.db-shm
