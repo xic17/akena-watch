@@ -137,9 +137,16 @@ make build            # o: CGO_ENABLED=0 go build -o bin/akena-watch .
 
 # ejecutar (datos en ./data, puerto 8080)
 ./bin/akena-watch
+
+# cambiar el puerto HTTP al ejecutar
+AKENA_PORT=9000 ./bin/akena-watch
+
+# puerto + interfaz de escucha (solo loopback, ideal detrás de un proxy)
+AKENA_BIND=127.0.0.1 AKENA_PORT=8080 ./bin/akena-watch
 ```
 
-Abre `http://localhost:8080` → te lleva a `/setup`.
+Abre `http://localhost:8080` → te lleva a `/setup`. Si cambiaste el puerto con
+`AKENA_PORT=9000`, abre `http://localhost:9000`.
 
 También puedes compilar para cualquier objetivo sin instalar nada en el destino:
 
@@ -331,6 +338,26 @@ Todo se configura con variables de entorno — el binario es agnóstico de plata
 
 Las credenciales de canales de alerta (tokens, contraseñas SMTP) se guardan en la
 base de datos, que a su vez vive en el directorio que tú protejas.
+
+### Ejemplos al ejecutar
+
+```sh
+# puerto distinto
+AKENA_PORT=9000 ./bin/akena-watch
+
+# puerto + directorio de datos propio
+AKENA_PORT=9000 AKENA_DATA_DIR=/var/lib/akena ./bin/akena-watch
+
+# solo loopback + puerto propio (para exponerlo detrás de nginx/CloudPanel)
+AKENA_BIND=127.0.0.1 AKENA_PORT=8080 ./bin/akena-watch
+```
+
+Con systemd, edita la línea `Environment=AKENA_PORT=...` en
+`deploy/akena-watch.service` y reinicia:
+
+```sh
+sudo systemctl daemon-reload && sudo systemctl restart akena-watch
+```
 
 ---
 
