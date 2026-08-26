@@ -522,8 +522,13 @@ if (document.getElementById("monitor-list")) {
     const isEdit = !!m;
     const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", notifier_ids: [] };
     const shares = (m && m.shares) || [];
-    const notifBoxes = NOTIFS.map((n) =>
-      `<label class="check-row"><input type="checkbox" name="notif" value="${n.id}" ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span></label>`).join("") || '<p class="field-note">No hay canales. Créalos en "Canales de alerta".</p>';
+    const activeNotifs = NOTIFS.filter((n) => n.active);
+    const inactiveNotifs = NOTIFS.filter((n) => !n.active);
+    const notifBoxes = activeNotifs.map((n) =>
+      `<label class="check-row"><input type="checkbox" name="notif" value="${n.id}" ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span></label>`).join("") +
+      inactiveNotifs.map((n) =>
+      `<label class="check-row" style="opacity:.55"><input type="checkbox" name="notif" value="${n.id}" disabled ${(f.notifier_ids || []).includes(n.id) ? "checked" : ""}> ${esc(n.name)} <span class="badge">${esc(n.type)}</span> <span class="badge">inactivo</span></label>`).join("") ||
+      '<p class="field-note">No hay canales. Créalos en "Canales de alerta".</p>';
 
     const shareList = shares.map((sh) =>
       `<div class="share-row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0">

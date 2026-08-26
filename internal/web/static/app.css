@@ -134,11 +134,10 @@ a:hover { text-decoration: underline; }
 
 /* --- Formularios --- */
 label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
-/* Nota: input:not([type]) cubre los campos sin atributo type — el navegador
-   los trata como type="text" pero el selector [type="text"] no los matchea
-   porque el atributo no existe en el DOM. */
-input[type="text"], input[type="password"], input[type="number"], input[type="url"],
-input:not([type]),
+/* Los inputs de texto se estilizan sin importar su type (text, email, url,
+   password, number, search, …). Solo quedan nativos los checkbox, radio,
+   range y los botones (que tienen su propio estilo .btn). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="range"]):not([type="color"]),
 select, textarea {
   width: 100%;
   background: var(--panel-2);
