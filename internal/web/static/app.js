@@ -533,10 +533,6 @@ if (document.getElementById("monitor-list")) {
             <label>Palabra clave (opcional)
               <input name="keyword" value="${esc(f.keyword || "")}" placeholder="buscar en la respuesta">
             </label>
-            <label>Cuerpo JSON (opcional)
-              <textarea name="body" rows="4" spellcheck="false" placeholder='{"query": "estado"}'>${esc(f.body || "")}</textarea>
-            </label>
-            <p class="field-note">Se envía con Content-Type: application/json (útil con POST/PUT/PATCH).</p>
             <label class="check-row"><input type="checkbox" name="invert_keyword" ${f.invert_keyword ? "checked" : ""}> Alertar si la palabra clave SÍ aparece</label>
           </div>
           <div>
@@ -546,6 +542,12 @@ if (document.getElementById("monitor-list")) {
             <label>Reintentos antes de alertar
               <input name="max_retries" type="number" min="1" max="10" value="${f.max_retries}">
             </label>
+            <div id="m-body-field" class="${f.type === "http" ? "" : "hidden"}">
+              <label>Cuerpo JSON (opcional)
+                <textarea name="body" rows="4" spellcheck="false" placeholder='{"query": "estado"}'>${esc(f.body || "")}</textarea>
+              </label>
+              <p class="field-note">Se envía con Content-Type: application/json (útil con POST/PUT/PATCH).</p>
+            </div>
           </div>
         </div>
 
@@ -577,7 +579,12 @@ if (document.getElementById("monitor-list")) {
     openModal(html);
 
     const typeSel = $("#m-type");
-    const toggleHttp = () => $("#m-http-fields").classList.toggle("hidden", typeSel.value !== "http");
+    const toggleHttp = () => {
+      const isHttp = typeSel.value === "http";
+      $("#m-http-fields").classList.toggle("hidden", !isHttp);
+      const bodyField = $("#m-body-field");
+      if (bodyField) bodyField.classList.toggle("hidden", !isHttp);
+    };
     typeSel.addEventListener("change", toggleHttp);
 
     $("#monitor-form").addEventListener("submit", async (e) => {
