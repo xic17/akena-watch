@@ -149,6 +149,40 @@ curl -sSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/insta
       </div>
     </section>
 
+    <!-- Donaciones -->
+    <section id="donaciones">
+      <div class="wrap">
+        <h2 class="section-title">Apoya el proyecto</h2>
+        <p class="section-sub">
+          Si Akena Watch te resulta útil, puedes apoyar su desarrollo. Cualquier
+          aporte, por pequeño que sea, ayuda a mantener este vigilante en guardia.
+        </p>
+        <div class="grid grid-2">
+          <div class="card donate-card">
+            <h3>USDT</h3>
+            <span class="network">Red Ethereum (ERC-20)</span>
+            <div class="addr">
+              <code id="addr-usdt">0xCc6E9BA3E7806c4673159F58f0C407Fc4577A6F7</code>
+              <button class="btn tiny" type="button" onclick="copyAddr('addr-usdt')">Copiar</button>
+            </div>
+          </div>
+          <div class="card donate-card">
+            <h3>Bitcoin</h3>
+            <span class="network">Red Bitcoin</span>
+            <div class="addr">
+              <code id="addr-btc">bc1q7j7zfz39j35pkjk0hj3cr839rcryq3l8wrufnm</code>
+              <button class="btn tiny" type="button" onclick="copyAddr('addr-btc')">Copiar</button>
+            </div>
+          </div>
+        </div>
+        <p class="dl-notes">
+          ⚠️ El USDT se recibe por la red <strong>ERC-20</strong> (Ethereum). Envía
+          siempre por esa red: una transferencia por otra red (TRC-20, BEP-20) podría
+          perderse. Si tienes dudas, consulta antes de enviar.
+        </p>
+      </div>
+    </section>
+
     <!-- Tributo -->
     <section class="tribute">
       <div class="wrap">
@@ -177,6 +211,17 @@ curl -sSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/insta
       </span>
     </div>
   </footer>
+
+  <script>
+  function copyAddr(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+      el.classList.add("copied");
+      setTimeout(() => el.classList.remove("copied"), 1500);
+    }).catch(() => {});
+  }
+  </script>
 
 </body>
 </html>

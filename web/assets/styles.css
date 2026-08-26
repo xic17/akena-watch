@@ -129,6 +129,7 @@ section + section { border-top: 1px solid var(--border); }
 }
 
 .grid { display: grid; gap: 18px; }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .grid-4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
@@ -163,6 +164,31 @@ table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.5p
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
 th { color: var(--amber-strong); font-weight: 600; }
 tr:last-child td { border-bottom: none; }
+
+/* --- Donaciones --- */
+.donate-card h3 { margin: 0 0 4px; font-size: 19px; }
+.donate-card .network {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.addr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.addr code {
+  flex: 1;
+  word-break: break-all;
+  transition: border-color 0.15s, color 0.15s;
+}
+.addr code.copied {
+  border-color: var(--green);
+  color: var(--green);
+}
+.btn.tiny { padding: 4px 10px; font-size: 12.5px; }
 
 /* --- Tributo --- */
 .tribute {
