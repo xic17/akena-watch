@@ -935,6 +935,41 @@ if (document.getElementById("user-list")) {
       </table>`;
   }
 
+  // sección compartida "Monitores que puede ver" (crear y editar usuario)
+  function accessSectionHTML(u) {
+    const groups = u.groups || [];
+    const access = u.access || [];
+    return `
+      <div id="user-access" class="${u.role === "admin" ? "hidden" : ""}">
+        <p class="field-note" style="margin-top:14px">Monitores que puede ver:</p>
+        <p class="field-note">Por grupos</p>
+        <div class="access-box">
+          ${GROUPS.length ? GROUPS.map((g) =>
+            `<label class="check-row"><input type="checkbox" name="group" value="${esc(g.name)}" ${groups.includes(g.name) ? "checked" : ""}> ${esc(g.name)} <span class="badge">${g.count}</span></label>`).join("") :
+            '<p class="muted small">Aún no hay grupos. Asigna grupos a los monitores.</p>'}
+        </div>
+        <p class="field-note">Monitores específicos</p>
+        <div class="access-box">
+          ${ALL_MONITORS.length ? ALL_MONITORS.map((m) =>
+            `<label class="check-row"><input type="checkbox" name="monitor" value="${m.id}" ${access.includes(m.id) ? "checked" : ""}> ${esc(m.name)} <span class="badge">${esc(m.group || m.type)}</span></label>`).join("") :
+            '<p class="muted small">No hay monitores en el sistema.</p>'}
+        </div>
+        <p class="field-note">Los administradores ven todos los monitores.</p>
+      </div>`;
+  }
+
+  function bindAccessToggle(formEl) {
+    const accessSection = $("#user-access", formEl);
+    const roleSel = $("select[name='role']", formEl);
+    roleSel.addEventListener("change", () => accessSection.classList.toggle("hidden", roleSel.value === "admin"));
+  }
+
+  function collectAccess(formEl) {
+    const groups = $$('input[name="group"]:checked', formEl).map((c) => c.value);
+    const monitors = $$('input[name="monitor"]:checked', formEl).map((c) => parseInt(c.value, 10));
+    return { groups, monitors };
+  }
+
   window.editUser = (id) => {
     const u = USERS.find((x) => x.id === id);
     if (!u) return;
@@ -954,30 +989,13 @@ if (document.getElementById("user-list")) {
             <option value="admin" ${u.role === "admin" ? "selected" : ""}>Administrador</option>
           </select>
         </label>
-        <div id="user-access" class="${u.role === "admin" ? "hidden" : ""}">
-          <p class="field-note" style="margin-top:14px">Monitores que puede ver:</p>
-          <p class="field-note">Por grupos</p>
-          <div class="access-box">
-            ${GROUPS.length ? GROUPS.map((g) =>
-              `<label class="check-row"><input type="checkbox" name="group" value="${esc(g.name)}" ${(u.groups || []).includes(g.name) ? "checked" : ""}> ${esc(g.name)} <span class="badge">${g.count}</span></label>`).join("") :
-              '<p class="muted small">Aún no hay grupos. Asigna grupos a los monitores.</p>'}
-          </div>
-          <p class="field-note">Monitores específicos</p>
-          <div class="access-box">
-            ${ALL_MONITORS.length ? ALL_MONITORS.map((m) =>
-              `<label class="check-row"><input type="checkbox" name="monitor" value="${m.id}" ${(u.access || []).includes(m.id) ? "checked" : ""}> ${esc(m.name)} <span class="badge">${esc(m.group || m.type)}</span></label>`).join("") :
-              '<p class="muted small">No hay monitores en el sistema.</p>'}
-          </div>
-          <p class="field-note">Los administradores ven todos los monitores.</p>
-        </div>
+        ${accessSectionHTML(u)}
         <div class="modal-actions">
           <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
           <button class="btn primary" type="submit">Guardar</button>
         </div>
       </form>`);
-    const accessSection = $("#user-access");
-    const roleSel = $("select[name='role']", $("#edit-user-form"));
-    roleSel.addEventListener("change", () => accessSection.classList.toggle("hidden", roleSel.value === "admin"));
+    bindAccessToggle($("#edit-user-form"));
     $("#edit-user-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -988,8 +1006,7 @@ if (document.getElementById("user-list")) {
           body: JSON.stringify({ role: fd.get("role"), email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim() }),
         })];
         if (!isAdmin) {
-          const groups = $$('input[name="group"]:checked', e.target).map((c) => c.value);
-          const monitors = $$('input[name="monitor"]:checked', e.target).map((c) => parseInt(c.value, 10));
+          const { groups, monitors } = collectAccess(e.target);
           jobs.push(api(`/api/users/${id}/groups`, { method: "PUT", body: JSON.stringify({ groups }) }));
           jobs.push(api(`/api/users/${id}/access`, { method: "PUT", body: JSON.stringify({ monitor_ids: monitors }) }));
         }
@@ -1038,19 +1055,29 @@ if (document.getElementById("user-list")) {
             <option value="admin">Administrador</option>
           </select>
         </label>
+        ${accessSectionHTML({ role: "collaborator", groups: [], access: [] })}
         <div class="modal-actions">
           <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
           <button class="btn primary" type="submit">Crear usuario</button>
         </div>
       </form>`);
+    bindAccessToggle($("#user-form"));
     $("#user-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
+      const isAdmin = fd.get("role") === "admin";
       try {
-        await api("/api/users", {
+        const res = await api("/api/users", {
           method: "POST",
           body: JSON.stringify({ username: fd.get("username").trim(), email: (fd.get("email") || "").trim(), telegram_id: (fd.get("telegram_id") || "").trim(), password: fd.get("password"), role: fd.get("role") }),
         });
+        if (!isAdmin) {
+          const { groups, monitors } = collectAccess(e.target);
+          await Promise.all([
+            api(`/api/users/${res.user.id}/groups`, { method: "PUT", body: JSON.stringify({ groups }) }),
+            api(`/api/users/${res.user.id}/access`, { method: "PUT", body: JSON.stringify({ monitor_ids: monitors }) }),
+          ]);
+        }
         toast("Usuario creado");
         closeModal();
         loadUsers();
