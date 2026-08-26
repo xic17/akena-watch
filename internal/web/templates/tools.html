@@ -4,80 +4,89 @@
   <h1>Herramientas</h1>
 </div>
 
-<div class="card tool-card" id="ping-tool">
-  <div class="tool-head">
-    <h2>Ping en tiempo real</h2>
-    <p class="muted small">Se ejecuta desde el servidor: mide la latencia real hacia tu infraestructura, paquete a paquete.</p>
-  </div>
-
-  <form id="ping-form" class="tool-form">
-    <label>Host
-      <input name="host" required maxlength="253" placeholder="ejemplo.com o 192.168.1.10" autocomplete="off" spellcheck="false">
-    </label>
-    <label>Tipo
-      <select name="proto">
-        <option value="tcp">TCP (conexión)</option>
-        <option value="icmp">ICMP (echo, requiere permisos)</option>
-      </select>
-    </label>
-    <label>Puerto (TCP)
-      <input name="port" id="ping-port" type="number" min="1" max="65535" value="443">
-    </label>
-    <label>Intervalo
-      <select name="interval">
-        <option value="500">0.5 s</option>
-        <option value="1000" selected>1 s</option>
-        <option value="2000">2 s</option>
-        <option value="5000">5 s</option>
-      </select>
-    </label>
-    <label>Paquetes
-      <select name="count">
-        <option value="0" selected>Continuo</option>
-        <option value="5">5</option>
-        <option value="10">10</option>
-        <option value="20">20</option>
-        <option value="50">50</option>
-      </select>
-    </label>
-    <div class="tool-actions">
-      <button class="btn primary" type="submit" id="ping-start">Iniciar</button>
-      <button class="btn danger" type="button" id="ping-stop" disabled>Detener</button>
-    </div>
-  </form>
-
-  <div id="ping-error" class="error-box hidden"></div>
-
-  <div id="ping-stats" class="stat-grid hidden">
-    <div class="stat-card"><span class="stat-value" id="ps-sent">0</span><span class="stat-label">Enviados</span></div>
-    <div class="stat-card"><span class="stat-value up" id="ps-recv">0</span><span class="stat-label">Recibidos</span></div>
-    <div class="stat-card"><span class="stat-value down" id="ps-lost">0</span><span class="stat-label">Perdidos</span></div>
-    <div class="stat-card"><span class="stat-value" id="ps-loss">0%</span><span class="stat-label">Pérdida</span></div>
-    <div class="stat-card"><span class="stat-value up" id="ps-min">—</span><span class="stat-label">Mín</span></div>
-    <div class="stat-card"><span class="stat-value" id="ps-avg">—</span><span class="stat-label">Media</span></div>
-    <div class="stat-card"><span class="stat-value down" id="ps-max">—</span><span class="stat-label">Máx</span></div>
-  </div>
-
-  <div class="chart-wrap hidden" id="ping-chart-wrap"><div id="ping-chart"></div></div>
-
-  <div class="ping-log" id="ping-log"></div>
+<div class="tabs" id="tools-tabs" role="tablist">
+  <button class="tab active" role="tab" aria-selected="true" data-tab="ping" type="button">Ping en tiempo real</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="whois" type="button">Whois</button>
 </div>
 
-<div class="card tool-card" id="whois-tool">
-  <div class="tool-head">
-    <h2>Whois</h2>
-    <p class="muted small">Consulta el registro WHOIS de un dominio o IP desde el servidor.</p>
-  </div>
-  <form id="whois-form" class="tool-form">
-    <label>Dominio o IP
-      <input name="domain" required maxlength="253" placeholder="ejemplo.com o 1.1.1.1" autocomplete="off" spellcheck="false">
-    </label>
-    <div class="tool-actions">
-      <button class="btn primary" type="submit" id="whois-btn">Consultar</button>
-      <button class="btn ghost" type="button" id="whois-copy" disabled>Copiar</button>
+<div class="tab-panel" id="tab-ping" role="tabpanel">
+  <div class="card tool-card" id="ping-tool">
+    <div class="tool-head">
+      <h2>Ping en tiempo real</h2>
+      <p class="muted small">Se ejecuta desde el servidor: mide la latencia real hacia tu infraestructura, paquete a paquete.</p>
     </div>
-  </form>
-  <div id="whois-error" class="error-box hidden"></div>
-  <pre id="whois-output" class="whois-output hidden"></pre>
+
+    <form id="ping-form" class="tool-form">
+      <label>Host
+        <input name="host" required maxlength="253" placeholder="ejemplo.com o 192.168.1.10" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Tipo
+        <select name="proto">
+          <option value="tcp">TCP (conexión)</option>
+          <option value="icmp">ICMP (echo, requiere permisos)</option>
+        </select>
+      </label>
+      <label>Puerto (TCP)
+        <input name="port" id="ping-port" type="number" min="1" max="65535" value="443">
+      </label>
+      <label>Intervalo
+        <select name="interval">
+          <option value="500">0.5 s</option>
+          <option value="1000" selected>1 s</option>
+          <option value="2000">2 s</option>
+          <option value="5000">5 s</option>
+        </select>
+      </label>
+      <label>Paquetes
+        <select name="count">
+          <option value="0" selected>Continuo</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+      </label>
+      <div class="tool-actions">
+        <button class="btn primary" type="submit" id="ping-start">Iniciar</button>
+        <button class="btn danger" type="button" id="ping-stop" disabled>Detener</button>
+      </div>
+    </form>
+
+    <div id="ping-error" class="error-box hidden"></div>
+
+    <div id="ping-stats" class="stat-grid hidden">
+      <div class="stat-card"><span class="stat-value" id="ps-sent">0</span><span class="stat-label">Enviados</span></div>
+      <div class="stat-card"><span class="stat-value up" id="ps-recv">0</span><span class="stat-label">Recibidos</span></div>
+      <div class="stat-card"><span class="stat-value down" id="ps-lost">0</span><span class="stat-label">Perdidos</span></div>
+      <div class="stat-card"><span class="stat-value" id="ps-loss">0%</span><span class="stat-label">Pérdida</span></div>
+      <div class="stat-card"><span class="stat-value up" id="ps-min">—</span><span class="stat-label">Mín</span></div>
+      <div class="stat-card"><span class="stat-value" id="ps-avg">—</span><span class="stat-label">Media</span></div>
+      <div class="stat-card"><span class="stat-value down" id="ps-max">—</span><span class="stat-label">Máx</span></div>
+    </div>
+
+    <div class="chart-wrap hidden" id="ping-chart-wrap"><div id="ping-chart"></div></div>
+
+    <div class="ping-log" id="ping-log"></div>
+  </div>
+</div>
+
+<div class="tab-panel hidden" id="tab-whois" role="tabpanel">
+  <div class="card tool-card" id="whois-tool">
+    <div class="tool-head">
+      <h2>Whois</h2>
+      <p class="muted small">Consulta el registro WHOIS de un dominio o IP desde el servidor.</p>
+    </div>
+    <form id="whois-form" class="tool-form">
+      <label>Dominio o IP
+        <input name="domain" required maxlength="253" placeholder="ejemplo.com o 1.1.1.1" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="tool-actions">
+        <button class="btn primary" type="submit" id="whois-btn">Consultar</button>
+        <button class="btn ghost" type="button" id="whois-copy" disabled>Copiar</button>
+      </div>
+    </form>
+    <div id="whois-error" class="error-box hidden"></div>
+    <pre id="whois-output" class="whois-output hidden"></pre>
+  </div>
 </div>
 {{end}}

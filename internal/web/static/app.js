@@ -930,6 +930,26 @@ if (document.getElementById("user-list")) {
   loadUsers();
 }
 
+// --- herramientas: pestañas ---
+const toolsTabs = document.getElementById("tools-tabs");
+if (toolsTabs) {
+  const panels = { ping: "tab-ping", whois: "tab-whois" };
+  const saved = localStorage.getItem("akena_tool_tab");
+  const switchTab = (name) => {
+    $$(".tab", toolsTabs).forEach((b) => {
+      const active = b.dataset.tab === name;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    for (const key in panels) {
+      document.getElementById(panels[key]).classList.toggle("hidden", key !== name);
+    }
+    localStorage.setItem("akena_tool_tab", name);
+  };
+  $$(".tab", toolsTabs).forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+  switchTab(panels[saved] ? saved : "ping");
+}
+
 // --- herramientas: ping en tiempo real ---
 const pingTool = document.getElementById("ping-tool");
 if (pingTool) {
