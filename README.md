@@ -163,8 +163,13 @@ devuelve error y todo pide login.
 
 | Rol | Gestiona usuarios | Monitores |
 |---|---|---|
-| **Administrador** | ✅ crear, cambiar rol, eliminar | Ve todos los monitores del sistema y posee los suyos |
+| **Administrador** | ✅ crear, editar (rol y correo), eliminar | Ve todos los monitores del sistema y posee los suyos |
 | **Colaborador** | ❌ | Solo sus monitores y los que le compartan |
+
+Cada usuario puede llevar un **correo asociado** (opcional): se pide al crear
+el usuario (wizard y panel) y se puede editar después. Validado en formato y
+**único** entre usuarios (los vacíos no cuentan). Queda listo para futuras
+funciones como recuperación de contraseña o notificaciones por correo.
 
 Reglas de protección:
 

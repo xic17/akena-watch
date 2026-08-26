@@ -124,6 +124,7 @@ func (s *Server) adminJSON(next http.HandlerFunc) http.HandlerFunc {
 // --- instalación (primer arranque) y login ---
 
 var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+var emailRe = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 func validateCredentials(username, password string) error {
 	if len(username) < 3 || len(username) > 32 {
@@ -134,6 +135,17 @@ func validateCredentials(username, password string) error {
 	}
 	if len(password) < 8 {
 		return errors.New("la contraseña debe tener al menos 8 caracteres")
+	}
+	return nil
+}
+
+// validateEmail valida un correo opcional: vacío es válido.
+func validateEmail(email string) error {
+	if email == "" {
+		return nil
+	}
+	if len(email) > 254 || !emailRe.MatchString(email) {
+		return errors.New("el correo no es válido")
 	}
 	return nil
 }
@@ -152,13 +164,19 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "solicitud inválida")
 		return
 	}
 	in.Username = strings.TrimSpace(in.Username)
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	if err := validateCredentials(in.Username, in.Password); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateEmail(in.Email); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -168,7 +186,11 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "error interno")
 		return
 	}
-	u, err := s.st.CreateUser(in.Username, string(hash), store.RoleAdmin)
+	u, err := s.st.CreateUser(in.Username, string(hash), store.RoleAdmin, in.Email)
+	if err == store.ErrEmailTaken {
+		writeErr(w, http.StatusBadRequest, "ese correo ya está registrado")
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo crear el administrador")
 		return
@@ -212,6 +234,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{
 		"id":       u.ID,
 		"username": u.Username,
+		"email":    u.Email,
 		"role":     u.Role,
 	})
 }

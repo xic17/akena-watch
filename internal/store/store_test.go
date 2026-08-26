@@ -14,7 +14,7 @@ func TestMonitorCRUD(t *testing.T) {
 	}
 	defer s.Close()
 
-	u, err := s.CreateUser("akena", "hash", RoleAdmin)
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestMigrateBodyColumn(t *testing.T) {
 	}
 	defer s.Close()
 
-	u, err := s.CreateUser("akena", "hash", RoleAdmin)
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,5 +107,54 @@ func TestMigrateBodyColumn(t *testing.T) {
 	}
 	if got.Body != `{"query":"status"}` {
 		t.Fatalf("body = %q, esperado {\"query\":\"status\"}", got.Body)
+	}
+}
+
+// TestMigrateUserEmail verifica que una base con el esquema anterior
+// (usuarios sin correo) se migra y que el correo es único.
+func TestMigrateUserEmail(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// esquema viejo: users sin la columna email
+	if _, err := db.Exec(`CREATE TABLE users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'collaborator',
+		status_title TEXT NOT NULL DEFAULT 'Estado de los servicios',
+		status_desc TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := Open(path) // dispara la migración
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "akena@ejemplo.com")
+	if err != nil {
+		t.Fatalf("crear usuario con correo tras migración: %v", err)
+	}
+	got, err := s.GetUserByID(u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Email != "akena@ejemplo.com" {
+		t.Fatalf("email = %q, esperado akena@ejemplo.com", got.Email)
+	}
+
+	// correo duplicado → ErrEmailTaken
+	if _, err := s.CreateUser("otro", "hash", RoleCollaborator, "akena@ejemplo.com"); err != ErrEmailTaken {
+		t.Fatalf("esperaba ErrEmailTaken, got %v", err)
+	}
+	// correos vacíos no colisionan
+	if _, err := s.CreateUser("sin-correo", "hash", RoleCollaborator, ""); err != nil {
+		t.Fatalf("usuario sin correo: %v", err)
 	}
 }

@@ -88,7 +88,7 @@ function bindAuthForm(formId, endpoint, redirect) {
       return;
     }
     try {
-      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password }) });
+      const res = await api(endpoint, { method: "POST", body: JSON.stringify({ username, password, email: (fd.get("email") || "").trim() }) });
       location.href = res.redirect || redirect;
     } catch (err) {
       errEl.textContent = err.message;
@@ -851,12 +851,15 @@ if (document.getElementById("user-list")) {
         <tbody>
           ${USERS.map((u) => `
             <tr>
-              <td><strong>${esc(u.username)}</strong></td>
+              <td>
+                <strong>${esc(u.username)}</strong>
+                ${u.email ? `<div class="muted small">${esc(u.email)}</div>` : ""}
+              </td>
               <td><span class="role-${esc(u.role)}">${u.role === "admin" ? "Administrador" : "Colaborador"}</span></td>
               <td>${u.monitors}</td>
               <td class="muted">${esc(u.created_at)}</td>
               <td style="text-align:right">
-                <button class="btn tiny ghost" type="button" onclick="toggleRole(${u.id})">${u.role === "admin" ? "Quitar admin" : "Hacer admin"}</button>
+                <button class="btn tiny ghost" type="button" onclick="editUser(${u.id})">Editar</button>
                 <button class="btn tiny danger" type="button" onclick="deleteUser(${u.id})">Borrar</button>
               </td>
             </tr>`).join("")}
@@ -864,16 +867,42 @@ if (document.getElementById("user-list")) {
       </table>`;
   }
 
-  window.toggleRole = async (id) => {
+  window.editUser = (id) => {
     const u = USERS.find((x) => x.id === id);
     if (!u) return;
-    try {
-      await api(`/api/users/${id}`, { method: "PUT", body: JSON.stringify({ role: u.role === "admin" ? "collaborator" : "admin" }) });
-      toast("Rol actualizado");
-      loadUsers();
-    } catch (err) {
-      toast(err.message, "bad");
-    }
+    openModal(`
+      <h2>Editar usuario</h2>
+      <p class="modal-sub muted">${esc(u.username)}</p>
+      <form id="edit-user-form">
+        <label>Correo (opcional)
+          <input name="email" type="email" maxlength="254" autocomplete="off" value="${esc(u.email || "")}" placeholder="usuario@dominio.com">
+        </label>
+        <label>Rol
+          <select name="role">
+            <option value="collaborator" ${u.role === "collaborator" ? "selected" : ""}>Colaborador</option>
+            <option value="admin" ${u.role === "admin" ? "selected" : ""}>Administrador</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+          <button class="btn primary" type="submit">Guardar</button>
+        </div>
+      </form>`);
+    $("#edit-user-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await api(`/api/users/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ role: fd.get("role"), email: (fd.get("email") || "").trim() }),
+        });
+        toast("Usuario actualizado");
+        closeModal();
+        loadUsers();
+      } catch (err) {
+        toast(err.message, "bad");
+      }
+    });
   };
 
   window.deleteUser = async (id) => {
@@ -896,6 +925,9 @@ if (document.getElementById("user-list")) {
         <label>Usuario
           <input name="username" required minlength="3" maxlength="32" autocomplete="off">
         </label>
+        <label>Correo (opcional)
+          <input name="email" type="email" maxlength="254" autocomplete="off" placeholder="usuario@dominio.com">
+        </label>
         <label>Contraseña
           <input name="password" type="password" required minlength="8" autocomplete="new-password">
         </label>
@@ -916,7 +948,7 @@ if (document.getElementById("user-list")) {
       try {
         await api("/api/users", {
           method: "POST",
-          body: JSON.stringify({ username: fd.get("username").trim(), password: fd.get("password"), role: fd.get("role") }),
+          body: JSON.stringify({ username: fd.get("username").trim(), email: (fd.get("email") || "").trim(), password: fd.get("password"), role: fd.get("role") }),
         });
         toast("Usuario creado");
         closeModal();
