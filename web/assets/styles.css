@@ -189,6 +189,14 @@ tr:last-child td { border-bottom: none; }
   color: var(--green);
 }
 .btn.tiny { padding: 4px 10px; font-size: 12.5px; }
+.donate-note {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+}
+.donate-note strong { color: var(--amber-strong); }
 
 /* --- Tributo --- */
 .tribute {
