@@ -486,6 +486,7 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .about-card p { text-align: left; }
 .about-sign { margin-top: 22px !important; color: var(--amber-strong); font-weight: 600; }
+.about-dev { margin-top: 4px !important; color: var(--muted); font-size: 13px; text-align: center; }
 .about-back { text-align: center; margin-top: 16px; }
 .about-back .btn { color: var(--muted); }
 .about-back .btn:hover { color: var(--amber-strong); }

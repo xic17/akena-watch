@@ -619,3 +619,9 @@ akena-watch/
 
 [MIT](LICENSE). Proyecto original inspirado en el concepto de Uptime Kuma
 (MIT), reimplementado desde cero en Go como homenaje a Akena. 🐾
+
+## Autor
+
+**Tupac de Paz** — creador y desarrollador de Akena Watch. Este proyecto es
+un tributo a Akena, su guardiana durante más de nueve años. *Siempre en
+Guardia.* 🐾
