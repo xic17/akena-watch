@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akena Watch — Siempre en Guardia</title>
+  <meta name="description" content="Akena Watch es un monitor de disponibilidad portable: un solo binario, SQLite embebida, sin dependencias. Corre en cualquier Linux, CloudPanel 2 y Cloudflare Containers.">
+  <link rel="icon" href="assets/paw.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        <span class="brand-name">Akena Watch</span>
+        <span class="brand-tagline">Siempre en Guardia</span>
+      </a>
+      <nav class="topnav">
+        <a href="index.html">Inicio</a>
+        <a href="#caracteristicas">Características</a>
+        <a href="#descargas">Descargas</a>
+        <a href="documentacion.html">Documentación</a>
+        <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap">
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        <h1>Akena Watch</h1>
+        <p class="tagline">Siempre en Guardia</p>
+        <p class="lead">
+          Un monitor de disponibilidad portable, inspirado en Uptime Kuma, escrito en Go.
+          Un solo binario estático con SQLite embebida y sin dependencias de runtime:
+          cópialo, ejecútalo y olvídate. Corre en cualquier Linux, detrás de
+          CloudPanel&nbsp;2 o dentro de Cloudflare&nbsp;Containers.
+        </p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#descargas">Descargar binarios</a>
+          <a class="btn" href="documentacion.html">Leer documentación</a>
+          <a class="btn" href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">Ver en GitHub</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Características -->
+    <section id="caracteristicas">
+      <div class="wrap">
+        <h2 class="section-title">Características</h2>
+        <p class="section-sub">
+          Vigilancia de servicios con la fidelidad de una buena guardiana:
+          discreta, constante y siempre alerta.
+        </p>
+        <div class="grid grid-3">
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Portable de verdad</h3>
+            <p>Un solo ejecutable estático con el frontend embebido. Sin Node, sin runtime, sin contenedores obligatorios.</p>
+          </div>
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Multi-usuario</h3>
+            <p>Administradores y colaboradores con sus propios monitores, canales y permisos por grupos o asignación manual.</p>
+          </div>
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Alertas por Telegram, webhook y SMTP</h3>
+            <p>Canales configurables con cuerpo JSON y variables estilo Uptime Kuma, botón de prueba y propiedad por usuario.</p>
+          </div>
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Estadísticas y dashboard</h3>
+            <p>Resumen estadístico, sparklines de latencia, uptime 24h/7d/30d, percentil 95 y gráficas por monitor.</p>
+          </div>
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Herramientas integradas</h3>
+            <p>Ping en tiempo real por WebSocket (TCP/ICMP), Whois y DNS Lookup en pestañas dentro de la misma sesión.</p>
+          </div>
+          <div class="card feature">
+            <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+            <h3>Página de estado pública</h3>
+            <p>Cada usuario puede publicar una página de estado por URL con slug, actualizada en tiempo real por WebSocket.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Inicio rápido -->
+    <section id="instalacion">
+      <div class="wrap">
+        <h2 class="section-title">Instalación en segundos</h2>
+        <p class="section-sub">
+          Descarga el binario para tu plataforma, o usa el instalador automático
+          que verifica el checksum de cada release.
+        </p>
+        <pre><code><span class="cmt"># instalación automática (Linux / macOS, amd64 o arm64)</span>
+curl -sSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/install.sh | sh</code></pre>
+        <p class="section-sub" style="margin-top:14px">
+          En el primer arranque, el binario crea su base de datos, escucha en el
+          puerto 8080 y te muestra el asistente para crear el usuario administrador.
+        </p>
+      </div>
+    </section>
+
+    <!-- Descargas -->
+    <section id="descargas">
+      <div class="wrap">
+        <h2 class="section-title">Descargar binarios</h2>
+        <p class="section-sub">
+          Releases oficiales firmadas con <code>SHA256SUMS</code>. Elige tu plataforma:
+        </p>
+        <div class="grid grid-4">
+          <div class="card dl-card">
+            <span class="os">Linux · x86_64</span>
+            <h3>linux-amd64</h3>
+            <span class="arch">VPS, servidores dedicados, CloudPanel&nbsp;2, Cloudflare</span>
+            <a class="btn primary" href="https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-linux-amd64">Descargar</a>
+          </div>
+          <div class="card dl-card">
+            <span class="os">Linux · ARM64</span>
+            <h3>linux-arm64</h3>
+            <span class="arch">Raspberry&nbsp;Pi, ARM VPS, Oracle&nbsp;ARM</span>
+            <a class="btn primary" href="https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-linux-arm64">Descargar</a>
+          </div>
+          <div class="card dl-card">
+            <span class="os">macOS · Intel</span>
+            <h3>darwin-amd64</h3>
+            <span class="arch">Macs con procesador Intel</span>
+            <a class="btn" href="https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-darwin-amd64">Descargar</a>
+          </div>
+          <div class="card dl-card">
+            <span class="os">macOS · Apple Silicon</span>
+            <h3>darwin-arm64</h3>
+            <span class="arch">Macs M1 / M2 / M3 / M4</span>
+            <a class="btn" href="https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-darwin-arm64">Descargar</a>
+          </div>
+        </div>
+        <p class="dl-notes">
+          Sumas de verificación: <a href="https://github.com/xic17/akena-watch/releases/latest/download/SHA256SUMS">SHA256SUMS</a> ·
+          Todas las versiones: <a href="https://github.com/xic17/akena-watch/releases" target="_blank" rel="noopener">página de releases</a> ·
+          Código fuente: <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">github.com/xic17/akena-watch</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Tributo -->
+    <section class="tribute">
+      <div class="wrap">
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        <h2>En memoria de Akena</h2>
+        <p>
+          Este proyecto nace como tributo a una compañera mestiza que, durante
+          más de nueve años, fue guardiana y familia. La misma fidelidad con la
+          que ella cuidó a los suyos es la que este vigilante dedica a tus
+          servicios: <strong>Siempre en Guardia</strong>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        Siempre en Guardia — en memoria de Akena
+      </span>
+      <span>
+        <a href="documentacion.html">Documentación</a> ·
+        <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/xic17/akena-watch/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a>
+      </span>
+    </div>
+  </footer>
+
+</body>
+</html>

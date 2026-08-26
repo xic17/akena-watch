@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentación — Akena Watch</title>
+  <meta name="description" content="Documentación de Akena Watch: instalación, configuración, uso y despliegue en Linux, CloudPanel 2 y Cloudflare Containers.">
+  <link rel="icon" href="assets/paw.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        <span class="brand-name">Akena Watch</span>
+        <span class="brand-tagline">Siempre en Guardia</span>
+      </a>
+      <nav class="topnav">
+        <a href="index.html">Inicio</a>
+        <a href="index.html#caracteristicas">Características</a>
+        <a href="index.html#descargas">Descargas</a>
+        <a href="documentacion.html">Documentación</a>
+        <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="doc">
+    <section>
+      <div class="wrap">
+        <h1 class="section-title">Documentación</h1>
+        <p class="section-sub">
+          Guía base de Akena Watch. La documentación completa y siempre actualizada
+          vive en el <a href="https://github.com/xic17/akena-watch#readme" target="_blank" rel="noopener">README del repositorio</a>;
+          esta página es el punto de partida.
+        </p>
+
+        <h2>¿Qué es Akena Watch?</h2>
+        <p>
+          Es un <strong>monitor de disponibilidad</strong> (uptime checker) portable,
+          inspirado en Uptime Kuma pero reimplementado desde cero en Go. Comprueba
+          periódicamente tus sitios web, servicios TCP y registros DNS; guarda el
+          historial de latencia y caídas en SQLite; y te avisa por Telegram, webhook
+          o correo cuando algo deja de responder.
+        </p>
+        <p>
+          Su diferencia fundamental es la portabilidad: <strong>un solo binario
+          estático</strong> con el frontend embebido. No necesitas Node.js, ni
+          contenedores, ni instalar nada más. Funciona en cualquier Linux moderno,
+          en <strong>CloudPanel&nbsp;2</strong> como sitio reverse-proxy, y dentro de
+          <strong>Cloudflare&nbsp;Containers</strong> con el mismo ejecutable.
+        </p>
+
+        <h2>Requisitos</h2>
+        <ul>
+          <li>Linux x86_64 o ARM64 (también macOS Intel y Apple Silicon).</li>
+          <li>Sin dependencias de runtime: ni Node, ni Python, ni Java.</li>
+          <li>Espacio para la base de datos SQLite (unos pocos MB por año de historial típico).</li>
+        </ul>
+
+        <h2>Instalación</h2>
+        <h3>Opción A — Instalador automático</h3>
+        <pre><code>curl -sSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/install.sh | sh</code></pre>
+        <p>
+          Descarga el binario de la última release para tu plataforma, verifica su
+          checksum y lo instala en <code>/usr/local/bin</code>. Puedes elegir versión
+          y destino con las variables <code>VERSION</code> y <code>AKENA_INSTALL_DIR</code>.
+        </p>
+
+        <h3>Opción B — Descarga manual</h3>
+        <p>
+          Descarga el binario correspondiente desde la
+          <a href="index.html#descargas">sección de descargas</a> o desde la
+          <a href="https://github.com/xic17/akena-watch/releases" target="_blank" rel="noopener">página de releases</a>,
+          hazlo ejecutable y cópialo donde quieras:
+        </p>
+        <pre><code><span class="cmt"># ejemplo para Linux x86_64</span>
+curl -sSL -o akena-watch \
+  https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-linux-amd64
+chmod +x akena-watch
+./akena-watch</code></pre>
+
+        <h2>Primer arranque</h2>
+        <ol>
+          <li>Ejecuta el binario: <code>./akena-watch</code> (escucha en el puerto 8080).</li>
+          <li>Abre <code>http://servidor:8080</code> — con la base de datos vacía te
+              redirige a <code>/setup</code>.</li>
+          <li>El asistente te pide <strong>crear el administrador</strong>: usuario,
+              contraseña (mínimo 8 caracteres), correo e ID de Telegram opcionales.</li>
+          <li>Listo: quedas autenticado en el dashboard. El asistente desaparece para
+              siempre una vez existe el primer usuario.</li>
+        </ol>
+
+        <h2>Configuración</h2>
+        <p>Todo se configura con variables de entorno:</p>
+        <table>
+          <thead>
+            <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>AKENA_DATA_DIR</code></td><td><code>./data</code></td><td>Directorio donde vive <code>akena.db</code> (persistencia)</td></tr>
+            <tr><td><code>AKENA_BIND</code></td><td><code>0.0.0.0</code></td><td>Interfaz de escucha (<code>127.0.0.1</code> detrás de un proxy)</td></tr>
+            <tr><td><code>AKENA_PORT</code></td><td><code>PORT</code> o <code>8080</code></td><td>Puerto HTTP</td></tr>
+            <tr><td><code>PORT</code></td><td>—</td><td>Convención PaaS, usado si <code>AKENA_PORT</code> no está definido</td></tr>
+          </tbody>
+        </table>
+        <pre><code><span class="cmt"># ejemplos</span>
+AKENA_PORT=9000 ./akena-watch
+AKENA_BIND=127.0.0.1 AKENA_PORT=8080 AKENA_DATA_DIR=/var/lib/akena ./akena-watch</code></pre>
+
+        <div class="alert">
+          <strong>ICMP:</strong> los checks de monitores usan TCP/DNS/HTTP (no requieren
+          permisos especiales). La herramienta de <em>ping</em> puede usar ICMP, pero si
+          el socket no está permitido (sin <code>CAP_NET_RAW</code> o sin root) cae
+          automáticamente a TCP o avisa para que ejecutes con permisos.
+        </div>
+
+        <h2>Uso básico</h2>
+        <h3>Usuarios y roles</h3>
+        <ul>
+          <li><strong>Administrador</strong>: ve y gestiona todo; crea usuarios.</li>
+          <li><strong>Colaborador</strong>: tiene sus propios monitores y canales; puede
+              ver los que el admin le asigne <em>por grupos</em> o <em>de forma manual</em>
+              (acceso de solo vista). Solo puede borrar sus propios monitores.</li>
+          <li>Cada usuario tiene correo e ID de Telegram en su ficha, para recibir alertas.</li>
+        </ul>
+
+        <h3>Monitores</h3>
+        <ul>
+          <li>Tipos: <strong>HTTP</strong> (con método, headers, cuerpo JSON y timeout),
+              <strong>TCP</strong> y <strong>DNS</strong>.</li>
+          <li>Se organizan en <strong>grupos</strong> para categorizarlos y asignar accesos.</li>
+          <li>Intervalo configurable y botón "Probar" inmediato.</li>
+          <li>Detalles por monitor: uptime 24h/7d/30d, percentil 95, eventos y gráficas.</li>
+        </ul>
+
+        <h3>Canales de alerta</h3>
+        <ul>
+          <li><strong>Webhook</strong>: cuerpo JSON con variables estilo Uptime Kuma
+              (<code>{{name}}</code>, <code>{{status}}</code>, <code>{{latency}}</code>, <code>{{at}}</code>…).</li>
+          <li><strong>Telegram</strong>: bot + ID de chat.</li>
+          <li><strong>SMTP</strong>: correo.</li>
+          <li>Cada canal tiene botón de prueba y pertenece a su usuario.</li>
+        </ul>
+
+        <h3>Página de estado pública</h3>
+        <p>
+          Cada usuario puede publicar una página de estado accesible por URL con slug
+          (<code>/status/mi-slug</code>), actualizada en tiempo real por WebSocket,
+          sin necesidad de iniciar sesión para verla.
+        </p>
+
+        <h2>Despliegue</h2>
+        <h3>Linux plano (systemd)</h3>
+        <pre><code>sudo useradd --system --home /opt/akena-watch --shell /usr/sbin/nologin akena
+sudo mkdir -p /opt/akena-watch/data
+sudo cp akena-watch /opt/akena-watch/
+sudo cp deploy/akena-watch.service /etc/systemd/system/
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now akena-watch</code></pre>
+
+        <h3>CloudPanel 2</h3>
+        <ol>
+          <li>Instala el binario y ejecútalo con <code>AKENA_BIND=127.0.0.1</code> en el puerto 8080.</li>
+          <li>En CloudPanel crea un sitio tipo <strong>Reverse Proxy</strong> hacia
+              <code>127.0.0.1:8080</code> con tu dominio y SSL.</li>
+          <li>El proxy de CloudPanel soporta WebSockets, así que el tiempo real funciona sin pasos extra.</li>
+        </ol>
+
+        <h3>Cloudflare Containers</h3>
+        <p>
+          Se incluye un Dockerfile multi-stage y un worker de keep-alive (cron de 1
+          minuto) para evitar el escalado a cero. La persistencia se hace con
+          <strong>tigrisfs</strong> (FUSE → R2): el mismo binario, mismo código, cero
+          cambios en la aplicación. Todo el código específico de plataforma vive en
+          <code>deploy/cloudflare/</code>.
+        </p>
+
+        <h3>Docker</h3>
+        <pre><code>docker build -t akena-watch -f deploy/Dockerfile .
+docker run -d --name akena-watch -p 8080:8080 -v akena-data:/data akena-watch</code></pre>
+
+        <h2>Herramientas</h2>
+        <p>
+          En la sesión de Herramientas (separada de la de Monitores) hay pestañas con:
+        </p>
+        <ul>
+          <li><strong>Ping</strong>: en tiempo real por WebSocket, con opción TCP/ICMP.</li>
+          <li><strong>Whois</strong>: consulta de dominios.</li>
+          <li><strong>DNS Lookup</strong>: resolución de registros.</li>
+        </ul>
+
+        <h2>Seguridad</h2>
+        <ul>
+          <li>Contraseñas hasheadas con bcrypt; sesiones con token aleatorio en cookie HttpOnly.</li>
+          <li>Protección CSRF: las peticiones de estado con <code>Origin</code> de otro host se rechazan.</li>
+          <li>La base de datos vive en el directorio que tú protejas (<code>AKENA_DATA_DIR</code>).</li>
+        </ul>
+
+        <h2>Documentación completa</h2>
+        <p>
+          El <a href="https://github.com/xic17/akena-watch#readme" target="_blank" rel="noopener">README del repositorio</a>
+          contiene la guía extendida: arquitectura, API, publicación de versiones,
+          desarrollo, limitaciones conocidas y roadmap. Las
+          <a href="https://github.com/xic17/akena-watch/releases" target="_blank" rel="noopener">releases</a>
+          siempre incluyen los binarios verificados con <code>SHA256SUMS</code>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>
+        <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
+        Siempre en Guardia — en memoria de Akena
+      </span>
+      <span>
+        <a href="index.html">Inicio</a> ·
+        <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/xic17/akena-watch/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a>
+      </span>
+    </div>
+  </footer>
+
+</body>
+</html>
