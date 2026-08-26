@@ -281,6 +281,13 @@ if (document.getElementById("monitor-list")) {
     $("#status-settings-btn").onclick = () => openStatusModal(sp);
   }
 
+  // ¿puede el usuario actual editar este monitor? (propietario, admin o
+  // compartición con edición; los accesos por grupo/manual son solo vista)
+  function canEditClient(m) {
+    if (ME_IS_ADMIN || m.owner_id === ME_ID) return true;
+    return (m.shares || []).some((s) => s.user_id === ME_ID && s.can_edit);
+  }
+
   function renderMonitors() {
     const list = $("#monitor-list");
     if (!MONITORS.length) {
@@ -313,8 +320,8 @@ if (document.getElementById("monitor-list")) {
         <div class="monitor-actions">
           <button class="btn tiny ghost" type="button" onclick="openMonitorDetails(${m.id})">Detalles</button>
           <button class="btn tiny ghost" type="button" onclick="testMonitor(${m.id}, this)">Probar</button>
-          <button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>
-          <button class="btn tiny danger" type="button" onclick="deleteMonitor(${m.id})">Borrar</button>
+          ${canEditClient(m) ? `<button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>` : ""}
+          ${m.owner_id === ME_ID || ME_IS_ADMIN ? `<button class="btn tiny danger" type="button" onclick="deleteMonitor(${m.id})">Borrar</button>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -884,7 +891,8 @@ if (document.getElementById("monitor-list")) {
   // ME_ID se resuelve antes de cargar el dashboard para etiquetar
   // correctamente los monitores ajenos en los listados.
   let ME_ID = 0;
-  api("/api/me").then((me) => { ME_ID = me.id; }).catch(() => {}).finally(() => loadDashboard());
+  let ME_IS_ADMIN = false;
+  api("/api/me").then((me) => { ME_ID = me.id; ME_IS_ADMIN = me.role === "admin"; }).catch(() => {}).finally(() => loadDashboard());
 }
 
 // --- gestión de usuarios (solo admin) ---

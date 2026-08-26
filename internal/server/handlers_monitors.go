@@ -311,7 +311,12 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
 		return
 	}
-	p, _ := s.monitorPayload(store.MonitorWithOwner{Monitor: cur, OwnerName: u.Username})
+	mo, err := s.monitorWithOwner(cur) // el propietario real, no el editor
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	p, _ := s.monitorPayload(mo)
 	writeOK(w, map[string]any{"monitor": p})
 }
 
@@ -322,9 +327,15 @@ func (s *Server) handleDeleteMonitor(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "id inválido")
 		return
 	}
-	canEdit, err := s.st.CanEditMonitor(u.ID, id, u.IsAdmin())
-	if err != nil || !canEdit {
-		writeErr(w, http.StatusForbidden, "no tienes permiso para eliminar este monitor")
+	m, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	// Solo el propietario (o un admin) puede eliminar: ni las comparticiones
+	// con edición ni los accesos por grupo/manual habilitan el borrado.
+	if !u.IsAdmin() && m.OwnerID != u.ID {
+		writeErr(w, http.StatusForbidden, "solo el propietario puede eliminar un monitor")
 		return
 	}
 	if err := s.st.DeleteMonitor(id); err != nil {

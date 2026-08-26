@@ -194,8 +194,11 @@ elige qué monitores puede ver el colaborador, de dos formas combinables:
 - **Manual**: marcando monitores específicos uno a uno.
 
 El acceso es de **solo vista** (ver estado, estadísticas y tiempo real); la
-edición sigue controlada por el propietario (compartir con edición). Los
-administradores ven todo por diseño.
+edición sigue controlada por el propietario (compartir con edición) y el
+**borrado es exclusivo del propietario** (o de un administrador): un
+colaborador jamás puede eliminar un monitor que le compartieron otros
+colaboradores o que le asignó el admin. Los administradores ven todo por
+diseño.
 
 ## Monitores
 
