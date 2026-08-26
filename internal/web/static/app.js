@@ -1083,3 +1083,45 @@ if (pingTool) {
 
   connectPingWS();
 }
+
+// --- herramientas: whois ---
+const whoisTool = document.getElementById("whois-tool");
+if (whoisTool) {
+  const $wf = (id) => document.getElementById(id);
+  let whoisText = "";
+
+  $wf("whois-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const domain = fd.get("domain").trim();
+    const btn = $wf("whois-btn");
+    btn.disabled = true;
+    btn.textContent = "Consultando…";
+    $wf("whois-error").classList.add("hidden");
+    $wf("whois-output").classList.add("hidden");
+    $wf("whois-copy").disabled = true;
+    try {
+      const res = await api("/api/whois?domain=" + encodeURIComponent(domain));
+      whoisText = res.text;
+      $wf("whois-output").textContent = whoisText;
+      $wf("whois-output").classList.remove("hidden");
+      $wf("whois-copy").disabled = false;
+    } catch (err) {
+      const box = $wf("whois-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Consultar";
+    }
+  });
+
+  $wf("whois-copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(whoisText);
+      toast("Texto WHOIS copiado");
+    } catch {
+      toast("No se pudo copiar", "bad");
+    }
+  });
+}

@@ -62,4 +62,22 @@
 
   <div class="ping-log" id="ping-log"></div>
 </div>
+
+<div class="card tool-card" id="whois-tool">
+  <div class="tool-head">
+    <h2>Whois</h2>
+    <p class="muted small">Consulta el registro WHOIS de un dominio o IP desde el servidor.</p>
+  </div>
+  <form id="whois-form" class="tool-form">
+    <label>Dominio o IP
+      <input name="domain" required maxlength="253" placeholder="ejemplo.com o 1.1.1.1" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="tool-actions">
+      <button class="btn primary" type="submit" id="whois-btn">Consultar</button>
+      <button class="btn ghost" type="button" id="whois-copy" disabled>Copiar</button>
+    </div>
+  </form>
+  <div id="whois-error" class="error-box hidden"></div>
+  <pre id="whois-output" class="whois-output hidden"></pre>
+</div>
 {{end}}

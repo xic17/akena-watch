@@ -391,6 +391,19 @@ textarea { resize: vertical; min-height: 70px; }
   color: var(--red);
   font-size: 14px;
 }
+.whois-output {
+  margin-top: 14px;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+}
 @media (max-width: 720px) {
   .tool-actions { grid-column: 1 / -1; }
 }

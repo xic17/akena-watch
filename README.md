@@ -59,8 +59,8 @@ como **CloudPanel 2**, o en **Cloudflare Containers** — con el mismo ejecutabl
 - **Alertas** por webhook genérico, **Telegram** y **email SMTP**, con botón de
   **prueba por canal** para validar la configuración.
 - **Herramientas**: sección de utilidades que se ejecutan desde el servidor —
-  por ahora, **ping en tiempo real** (TCP por defecto o ICMP con permisos),
-  con estadísticas en vivo (mín/media/máx, pérdida), gráfica y log por paquete.
+  **ping en tiempo real** (TCP por defecto o ICMP con permisos, con estadísticas,
+  gráfica y log) y **whois** (dominios e IPs, con botón de copiar).
 - **Página de estado pública** por usuario, sin autenticación, con **historial
   visual de las últimas 24 horas** por monitor.
 - **Un solo binario**: el frontend está embebido (`go:embed`); no hay
@@ -267,6 +267,13 @@ echo "net.ipv4.ping_group_range=0 2147483647" | sudo tee /etc/sysctl.d/99-ping.c
 sudo setcap cap_net_raw+ep /usr/local/bin/akena-watch
 ```
 
+### Whois
+
+Consulta el registro WHOIS de un **dominio o IP** desde el servidor
+(`GET /api/whois?domain=...`), con la cadena de referencias IANA → registro →
+registrador resuelta automáticamente. Muestra el texto completo del registro
+en una vista desplazable, con botón para copiarlo, y timeout de 20 segundos.
+
 ## Configuración
 
 Todo se configura con variables de entorno — el binario es agnóstico de plataforma:
@@ -448,6 +455,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET` | `/api/version` | público | Nombre y versión del binario |
 | `GET` | `/ws` | sesión (cookie o `?token=`) | WebSocket de tiempo real |
 | `GET` | `/ws/ping` | sesión (cookie o `?token=`) | Herramienta de ping en tiempo real (mensajes JSON) |
+| `GET` | `/api/whois?domain=...` | sesión | Registro WHOIS de un dominio o IP |
 
 ## Seguridad
 
