@@ -10,6 +10,7 @@
   <button class="tab" role="tab" aria-selected="false" data-tab="dns" type="button">DNS Lookup</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="http" type="button">Inspección HTTP</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="tls" type="button">Certificado TLS</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="ports" type="button">Puertos</button>
 </div>
 
 <div class="tab-panel" id="tab-ping" role="tabpanel">
@@ -205,6 +206,49 @@
       <p class="http-section">Detalles del certificado</p>
       <table class="events-table">
         <tbody id="tls-rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel hidden" id="tab-ports" role="tabpanel">
+  <div class="card tool-card" id="ports-tool">
+    <div class="tool-head">
+      <h2>Escaneo de puertos</h2>
+      <p class="muted small">Comprueba qué puertos TCP aceptan conexión en un host, con su latencia.</p>
+    </div>
+    <form id="ports-form" class="tool-form tool-form-wide">
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr">
+        <label>Host
+          <input name="host" required maxlength="253" placeholder="ejemplo.com o 192.168.1.10" autocomplete="off" spellcheck="false">
+        </label>
+        <label>Perfil
+          <select name="preset" id="ports-preset">
+            <option value="common">Puertos comunes</option>
+            <option value="web">Web (80, 443, 8080, 8443, 3000)</option>
+            <option value="db">Bases de datos</option>
+            <option value="range">Rango personalizado</option>
+          </select>
+        </label>
+      </div>
+      <div id="ports-range" class="form-grid hidden" style="grid-template-columns: 140px 140px">
+        <label>Desde
+          <input name="range_start" type="number" min="1" max="65535" value="1">
+        </label>
+        <label>Hasta
+          <input name="range_end" type="number" min="1" max="65535" value="1000">
+        </label>
+      </div>
+      <div class="tool-actions">
+        <button class="btn primary" type="submit" id="ports-btn">Escanear</button>
+      </div>
+    </form>
+    <div id="ports-error" class="error-box hidden"></div>
+    <div id="ports-result" class="hidden">
+      <p class="field-note" id="ports-summary"></p>
+      <table class="events-table">
+        <thead><tr><th>Puerto</th><th>Servicio</th><th>Latencia</th></tr></thead>
+        <tbody id="ports-rows"></tbody>
       </table>
     </div>
   </div>

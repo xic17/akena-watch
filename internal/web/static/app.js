@@ -1137,7 +1137,7 @@ if (document.getElementById("user-list")) {
 // --- herramientas: pestañas ---
 const toolsTabs = document.getElementById("tools-tabs");
 if (toolsTabs) {
-  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http", tls: "tab-tls" };
+  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http", tls: "tab-tls", ports: "tab-ports" };
   const saved = localStorage.getItem("akena_tool_tab");
   const switchTab = (name) => {
     $$(".tab", toolsTabs).forEach((b) => {
@@ -1526,5 +1526,59 @@ if (tlsTool) {
       row("Cadena", res.chain_len + " certificado(s)"),
     ].join("");
     $tf("tls-result").classList.remove("hidden");
+  }
+}
+
+// --- herramientas: escaneo de puertos ---
+const portsTool = document.getElementById("ports-tool");
+if (portsTool) {
+  const $pf = (id) => document.getElementById(id);
+  const presets = {
+    web: [80, 443, 8080, 8443, 3000],
+    db: [3306, 5432, 6379, 27017, 11211],
+  };
+
+  $pf("ports-preset").addEventListener("change", (e) => {
+    $pf("ports-range").classList.toggle("hidden", e.target.value !== "range");
+  });
+
+  $pf("ports-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = $pf("ports-btn");
+    btn.disabled = true;
+    btn.textContent = "Escaneando…";
+    $pf("ports-error").classList.add("hidden");
+    $pf("ports-result").classList.add("hidden");
+
+    const payload = { host: fd.get("host").trim() };
+    const preset = fd.get("preset");
+    if (preset === "range") {
+      payload.range_start = parseInt(fd.get("range_start") || "1", 10);
+      payload.range_end = parseInt(fd.get("range_end") || "1000", 10);
+    } else if (presets[preset]) {
+      payload.ports = presets[preset];
+    }
+    try {
+      const res = await api("/api/portscan", { method: "POST", body: JSON.stringify(payload) });
+      renderPortsResult(res);
+    } catch (err) {
+      const box = $pf("ports-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Escanear";
+    }
+  });
+
+  function renderPortsResult(res) {
+    $pf("ports-summary").innerHTML =
+      `${res.open.length} de ${res.total} puertos abiertos en ${esc(res.host)} · ${res.elapsed_ms} ms`;
+    $pf("ports-rows").innerHTML = res.open.length
+      ? res.open.map((p) =>
+          `<tr><td><span class="badge">${p.port}</span></td><td>${esc(p.service || "—")}</td><td>${p.latency_ms} ms</td></tr>`).join("")
+      : '<tr><td colspan="3" class="muted">Ninguno abierto (el host puede filtrar puertos o estar caído)</td></tr>';
+    $pf("ports-result").classList.remove("hidden");
   }
 }
