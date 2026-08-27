@@ -84,17 +84,10 @@ func tcpPing(ctx context.Context, host string, port, seq int) Result {
 	return Result{Seq: seq, OK: true, LatencyMS: latency}
 }
 
-// icmpPing envía un echo request usando el socket "udp4" (ping sockets de
-// Linux), que permite ICMP sin socket crudo cuando el kernel lo permite.
+// icmpPing envía un echo request intentando primero el ping socket sin
+// privilegios ("udp4") y, si el kernel lo deniega, el socket crudo
+// ("ip4:icmp") que solo requiere root o CAP_NET_RAW (p. ej. Docker).
 func icmpPing(ctx context.Context, host string, seq int) Result {
-	conn, err := icmp.ListenPacket("udp4", "0.0.0.0")
-	if err != nil {
-		return Result{Seq: seq, OK: false, Fatal: true,
-			Error: "ICMP no disponible (permisos): " + err.Error() +
-				". Usa el tipo TCP o habilita los permisos de ping en el servidor."}
-	}
-	defer conn.Close()
-
 	ip, err := net.ResolveIPAddr("ip4", host)
 	if err != nil {
 		return Result{Seq: seq, OK: false, Error: "resolución DNS: " + err.Error()}
@@ -110,46 +103,64 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 		return Result{Seq: seq, OK: false, Error: err.Error()}
 	}
 
-	start := time.Now()
-	// El socket "udp4" (ping socket de Linux) exige un destino *net.UDPAddr:
-	// pasar un *net.IPAddr produce "invalid argument" al escribir.
-	dst := &net.UDPAddr{IP: ip.IP}
-	if _, err := conn.WriteTo(data, dst); err != nil {
-		return Result{Seq: seq, OK: false, Error: err.Error()}
-	}
-
-	deadline := 2 * time.Second
-	if dl, ok := ctx.Deadline(); ok {
-		if left := time.Until(dl); left < deadline {
-			deadline = left
-		}
-	}
-	if deadline <= 0 {
-		return Result{Seq: seq, OK: false, Error: "contexto cancelado"}
-	}
-	_ = conn.SetReadDeadline(time.Now().Add(deadline))
-
-	buf := make([]byte, 1500)
-	for {
-		n, peer, err := conn.ReadFrom(buf)
+	for _, network := range []string{"udp4", "ip4:icmp"} {
+		conn, err := icmp.ListenPacket(network, "0.0.0.0")
 		if err != nil {
-			return Result{Seq: seq, OK: false, Error: "sin respuesta (timeout)"}
+			if network == "udp4" {
+				continue // sin ping socket: probamos el socket crudo
+			}
+			return Result{Seq: seq, OK: false, Fatal: true,
+				Error: "ICMP no disponible (permisos): " + err.Error() +
+					". Si instalaste con install.sh o systemd ya debería estar habilitado; " +
+					"si ejecutas el binario a mano, usa TCP o concede permisos de ping."}
 		}
-		// El peer llega como *net.UDPAddr (p. ej. "1.1.1.1:0"): compara solo la IP.
-		peerIP := ipAddrOf(peer)
-		if peerIP == nil || !peerIP.Equal(ip.IP) {
-			continue // respuesta de otro destino
+		defer conn.Close()
+
+		// El socket udp4 exige destino *net.UDPAddr; el crudo, *net.IPAddr.
+		var dst net.Addr = ip
+		if network == "udp4" {
+			dst = &net.UDPAddr{IP: ip.IP}
 		}
-		rm, err := icmp.ParseMessage(1, buf[:n])
-		if err != nil {
-			continue
+
+		start := time.Now()
+		if _, err := conn.WriteTo(data, dst); err != nil {
+			return Result{Seq: seq, OK: false, Error: err.Error()}
 		}
-		echo, ok := rm.Body.(*icmp.Echo)
-		if rm.Type != ipv4.ICMPTypeEchoReply || !ok || echo.ID != id || echo.Seq != seq {
-			continue
+
+		deadline := 2 * time.Second
+		if dl, ok := ctx.Deadline(); ok {
+			if left := time.Until(dl); left < deadline {
+				deadline = left
+			}
 		}
-		return Result{Seq: seq, OK: true, LatencyMS: int(time.Since(start).Milliseconds())}
+		if deadline <= 0 {
+			return Result{Seq: seq, OK: false, Error: "contexto cancelado"}
+		}
+		_ = conn.SetReadDeadline(time.Now().Add(deadline))
+
+		buf := make([]byte, 1500)
+		for {
+			n, peer, err := conn.ReadFrom(buf)
+			if err != nil {
+				return Result{Seq: seq, OK: false, Error: "sin respuesta (timeout)"}
+			}
+			// El peer llega como *net.UDPAddr (p. ej. "1.1.1.1:0"): compara solo la IP.
+			peerIP := ipAddrOf(peer)
+			if peerIP == nil || !peerIP.Equal(ip.IP) {
+				continue // respuesta de otro destino
+			}
+			rm, err := icmp.ParseMessage(1, buf[:n])
+			if err != nil {
+				continue
+			}
+			echo, ok := rm.Body.(*icmp.Echo)
+			if rm.Type != ipv4.ICMPTypeEchoReply || !ok || echo.ID != id || echo.Seq != seq {
+				continue
+			}
+			return Result{Seq: seq, OK: true, LatencyMS: int(time.Since(start).Milliseconds())}
+		}
 	}
+	return Result{Seq: seq, OK: false, Fatal: true, Error: "ICMP no disponible"}
 }
 
 // ipAddrOf extrae la IP de un net.Addr devuelto por ReadFrom

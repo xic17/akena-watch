@@ -286,14 +286,17 @@ infraestructura desde donde corre Akena Watch, no desde el navegador.
 - **TCP** (por defecto): mide la latencia de conexión a `host:puerto`.
   Funciona en cualquier entorno sin privilegios (también en Cloudflare
   Containers).
-- **ICMP**: echo clásico. Requiere permisos de ping en el sistema.
+- **ICMP**: echo clásico. Funciona **sin configuración** si instalaste con
+  `install.sh` (concede `cap_net_raw` automáticamente) o con el servicio
+  systemd incluido (`AmbientCapabilities`), y también en Docker/Cloudflare
+  Containers (el contenedor corre como root).
 - Transmite cada paquete por WebSocket (`GET /ws/ping`): estadísticas en vivo
   (enviados/recibidos/perdidos, mín/media/máx, % de pérdida), gráfica y log.
   Si el error es permanente (p. ej. ICMP sin permisos), la sesión se detiene
   con un único aviso claro en lugar de repetir el fallo.
 
-**Habilitar ICMP** (si el servicio corre como usuario sin privilegios, típico
-con systemd, verás `permission denied`):
+**Solo si ejecutas el binario a mano** como usuario sin privilegios verás
+`permission denied`; entonces elige una de estas:
 
 ```sh
 # Opción A (recomendada): habilita el ping para todos los usuarios y

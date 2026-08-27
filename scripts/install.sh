@@ -73,6 +73,15 @@ mkdir -p "$DEST"
 cp "$TMP/$BIN_NAME" "$DEST_BIN"
 chmod +x "$DEST_BIN"
 
+# ICMP sin fricción: si tenemos root (típico al instalar en /usr/local/bin),
+# concedemos CAP_NET_RAW al binario para que el ping ICMP funcione sin que
+# el usuario tenga que configurar nada. Se reaplica en cada actualización.
+if [ "$(id -u)" = "0" ] && command -v setcap >/dev/null 2>&1; then
+  if setcap cap_net_raw+ep "$DEST_BIN" 2>/dev/null; then
+    echo "✔ Ping ICMP habilitado (cap_net_raw concedido al binario)"
+  fi
+fi
+
 echo
 echo "✔ Akena Watch ${VERSION} instalado en ${DEST_BIN}"
 echo

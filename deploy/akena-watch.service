@@ -36,5 +36,10 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/akena-watch/data
 
+# Ping ICMP sin configuración extra: systemd concede la capacidad de socket
+# crudo al arrancar, aunque el servicio corra como el usuario akena.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+
 [Install]
 WantedBy=multi-user.target
