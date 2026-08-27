@@ -111,7 +111,10 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 	}
 
 	start := time.Now()
-	if _, err := conn.WriteTo(data, ip); err != nil {
+	// El socket "udp4" (ping socket de Linux) exige un destino *net.UDPAddr:
+	// pasar un *net.IPAddr produce "invalid argument" al escribir.
+	dst := &net.UDPAddr{IP: ip.IP}
+	if _, err := conn.WriteTo(data, dst); err != nil {
 		return Result{Seq: seq, OK: false, Error: err.Error()}
 	}
 
@@ -132,7 +135,9 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 		if err != nil {
 			return Result{Seq: seq, OK: false, Error: "sin respuesta (timeout)"}
 		}
-		if peer.String() != ip.String() {
+		// El peer llega como *net.UDPAddr (p. ej. "1.1.1.1:0"): compara solo la IP.
+		peerIP := ipAddrOf(peer)
+		if peerIP == nil || !peerIP.Equal(ip.IP) {
 			continue // respuesta de otro destino
 		}
 		rm, err := icmp.ParseMessage(1, buf[:n])
@@ -145,4 +150,16 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 		}
 		return Result{Seq: seq, OK: true, LatencyMS: int(time.Since(start).Milliseconds())}
 	}
+}
+
+// ipAddrOf extrae la IP de un net.Addr devuelto por ReadFrom
+// (el tipo concreto depende del socket: UDPAddr para "udp4", IPAddr para raw).
+func ipAddrOf(a net.Addr) net.IP {
+	switch v := a.(type) {
+	case *net.UDPAddr:
+		return v.IP
+	case *net.IPAddr:
+		return v.IP
+	}
+	return nil
 }
