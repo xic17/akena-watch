@@ -1137,7 +1137,7 @@ if (document.getElementById("user-list")) {
 // --- herramientas: pestañas ---
 const toolsTabs = document.getElementById("tools-tabs");
 if (toolsTabs) {
-  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http" };
+  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http", tls: "tab-tls" };
   const saved = localStorage.getItem("akena_tool_tab");
   const switchTab = (name) => {
     $$(".tab", toolsTabs).forEach((b) => {
@@ -1456,5 +1456,73 @@ if (httpTool) {
     $hf("http-body-meta").textContent = res.body_len !== undefined ? `(${res.body_len} bytes leídos)` : "";
     $hf("http-body").textContent = res.body_preview || "(cuerpo vacío)";
     $hf("http-result").classList.remove("hidden");
+  }
+}
+
+// --- herramientas: certificado TLS ---
+const tlsTool = document.getElementById("tls-tool");
+if (tlsTool) {
+  const $tf = (id) => document.getElementById(id);
+
+  $tf("tls-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = $tf("tls-btn");
+    btn.disabled = true;
+    btn.textContent = "Comprobando…";
+    $tf("tls-error").classList.add("hidden");
+    $tf("tls-result").classList.add("hidden");
+    try {
+      const res = await api("/api/tlscheck", {
+        method: "POST",
+        body: JSON.stringify({ host: fd.get("host").trim(), port: parseInt(fd.get("port") || "443", 10) }),
+      });
+      renderTLSResult(res);
+    } catch (err) {
+      const box = $tf("tls-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Comprobar";
+    }
+  });
+
+  function renderTLSResult(res) {
+    if (!res.success) {
+      const box = $tf("tls-error");
+      box.textContent = "⚠️ " + (res.error || "no se pudo conectar");
+      box.classList.remove("hidden");
+      return;
+    }
+    const c = res.cert || {};
+    const status = c.expired ? '<span class="badge amber">expirado</span>'
+      : c.not_yet_valid ? '<span class="badge amber">aún no válido</span>'
+      : c.days_left <= 14 ? '<span class="badge amber">expira pronto</span>'
+      : '<span class="badge">válido</span>';
+    $tf("tls-summary").innerHTML =
+      `${esc(res.host)}:${res.port} → ${status} · ${esc(res.tls_proto || "")} · ${res.handshake_ms} ms handshake`;
+
+    const daysCls = c.days_left <= 14 ? (c.expired ? "down" : "amber") : "up";
+    const t = (label, val, cls) =>
+      `<div class="stat-card"><span class="stat-value${cls ? " " + cls : ""}">${val}</span><span class="stat-label">${label}</span></div>`;
+    $tf("tls-stats").innerHTML =
+      t("Días restantes", c.days_left !== undefined ? c.days_left : "—", daysCls) +
+      t("Emisor", esc(c.issuer || "—")) +
+      t("Protocolo", esc(res.tls_proto || "—")) +
+      t("Cipher", esc(res.cipher || "—"));
+
+    const row = (k, v) => `<tr><td style="width:30%;opacity:.8">${k}</td><td>${v}</td></tr>`;
+    $tf("tls-rows").innerHTML = [
+      row("Sujeto", esc(c.subject || "—")),
+      row("SANs", esc((c.sans || []).join(", ") || "—")),
+      row("Válido desde", esc(c.not_before || "—")),
+      row("Válido hasta", esc(c.not_after || "—")),
+      row("Nº de serie", esc(c.serial || "—")),
+      row("Firma", esc(c.sig_alg || "—")),
+      row("Clave", esc(c.key || "—")),
+      row("Cadena", res.chain_len + " certificado(s)"),
+    ].join("");
+    $tf("tls-result").classList.remove("hidden");
   }
 }

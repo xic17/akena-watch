@@ -9,6 +9,7 @@
   <button class="tab" role="tab" aria-selected="false" data-tab="whois" type="button">Whois</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="dns" type="button">DNS Lookup</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="http" type="button">Inspección HTTP</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="tls" type="button">Certificado TLS</button>
 </div>
 
 <div class="tab-panel" id="tab-ping" role="tabpanel">
@@ -172,8 +173,39 @@
         <thead><tr><th>Header</th><th>Valor</th></tr></thead>
         <tbody id="http-headers"></tbody>
       </table>
-      <p class="http-section">Cuerpo <span class="muted small" id="http-body-meta"></span></p>
+      <p class="field-note">Cuerpo <span class="muted small" id="http-body-meta"></span></p>
       <pre id="http-body" class="whois-output"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel hidden" id="tab-tls" role="tabpanel">
+  <div class="card tool-card" id="tls-tool">
+    <div class="tool-head">
+      <h2>Certificado TLS</h2>
+      <p class="muted small">Inspecciona el certificado de un servidor: validez, emisor, SANs y días restantes.</p>
+    </div>
+    <form id="tls-form" class="tool-form tool-form-wide">
+      <div class="form-grid" style="grid-template-columns: 1fr 140px">
+        <label>Host
+          <input name="host" required maxlength="253" placeholder="ejemplo.com o 192.168.1.10" autocomplete="off" spellcheck="false">
+        </label>
+        <label>Puerto
+          <input name="port" type="number" min="1" max="65535" value="443">
+        </label>
+      </div>
+      <div class="tool-actions">
+        <button class="btn primary" type="submit" id="tls-btn">Comprobar</button>
+      </div>
+    </form>
+    <div id="tls-error" class="error-box hidden"></div>
+    <div id="tls-result" class="hidden">
+      <p class="field-note" id="tls-summary"></p>
+      <div class="stat-grid" id="tls-stats"></div>
+      <p class="http-section">Detalles del certificado</p>
+      <table class="events-table">
+        <tbody id="tls-rows"></tbody>
+      </table>
     </div>
   </div>
 </div>

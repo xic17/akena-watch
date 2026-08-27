@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/whois", s.authJSON(s.handleWhois))
 	mux.HandleFunc("GET /api/dns", s.authJSON(s.handleDNSLookup))
 	mux.HandleFunc("POST /api/httpcheck", s.authJSON(s.handleHTTPCheck))
+	mux.HandleFunc("POST /api/tlscheck", s.authJSON(s.handleTLSCheck))
 
 	staticFS, err := fs.Sub(web.FS, "static")
 	if err != nil {
