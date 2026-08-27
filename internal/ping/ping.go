@@ -122,6 +122,17 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 			dst = &net.UDPAddr{IP: ip.IP}
 		}
 
+		// En el ping socket de Linux ("udp4") el kernel reescribe el ID del
+		// echo request con el puerto local del socket (inet_num) e ignora el
+		// ID del mensaje: la respuesta trae ese puerto como ID. En el socket
+		// crudo, en cambio, el ID enviado viaja tal cual.
+		replyID := id
+		if network == "udp4" {
+			if la, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+				replyID = la.Port
+			}
+		}
+
 		start := time.Now()
 		if _, err := conn.WriteTo(data, dst); err != nil {
 			return Result{Seq: seq, OK: false, Error: err.Error()}
@@ -154,7 +165,7 @@ func icmpPing(ctx context.Context, host string, seq int) Result {
 				continue
 			}
 			echo, ok := rm.Body.(*icmp.Echo)
-			if rm.Type != ipv4.ICMPTypeEchoReply || !ok || echo.ID != id || echo.Seq != seq {
+			if rm.Type != ipv4.ICMPTypeEchoReply || !ok || echo.ID != replyID || echo.Seq != seq {
 				continue
 			}
 			return Result{Seq: seq, OK: true, LatencyMS: int(time.Since(start).Milliseconds())}
