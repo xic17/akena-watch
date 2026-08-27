@@ -411,6 +411,10 @@ textarea { resize: vertical; min-height: 70px; }
   color: var(--muted);
 }
 #http-body.whois-output { margin-top: 0; }
+/* el resultado puede traer URLs y valores de headers muy largos: se parten
+   en varias líneas en vez de desbordar el margen derecho del panel. */
+#http-tool { overflow-wrap: break-word; }
+#http-tool .events-table td { word-break: break-word; }
 /* formularios con campos anchos (p. ej. inspección HTTP): apilados a ancho
    completo; la rejilla auto-fit empaquetaría las columnas y las desalinearía. */
 .tool-form-wide { display: block; }
