@@ -403,6 +403,14 @@ textarea { resize: vertical; min-height: 70px; }
   align-items: end;
 }
 .tool-form label { margin: 0 0 6px; }
+/* secciones del resultado de inspección HTTP: encabezados con aire uniforme
+   y bloques (tabla / cuerpo) pegados a su encabezado, sin márgenes extra. */
+.http-section {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+#http-body.whois-output { margin-top: 0; }
 /* formularios con campos anchos (p. ej. inspección HTTP): apilados a ancho
    completo; la rejilla auto-fit empaquetaría las columnas y las desalinearía. */
 .tool-form-wide { display: block; }
