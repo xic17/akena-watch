@@ -403,6 +403,10 @@ textarea { resize: vertical; min-height: 70px; }
   align-items: end;
 }
 .tool-form label { margin: 0 0 6px; }
+/* formularios con campos anchos (p. ej. inspección HTTP): apilados a ancho
+   completo; la rejilla auto-fit empaquetaría las columnas y las desalinearía. */
+.tool-form-wide { display: block; }
+.tool-form-wide .form-grid { margin-top: 6px; }
 .tool-actions { display: flex; gap: 8px; align-items: end; margin-top: 14px; }
 .tool-actions .btn { margin-top: 4px; }
 .stat-grid {
