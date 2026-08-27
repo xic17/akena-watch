@@ -1506,14 +1506,16 @@ if (tlsTool) {
     const daysCls = c.days_left <= 14 ? (c.expired ? "down" : "amber") : "up";
     const t = (label, val, cls) =>
       `<div class="stat-card"><span class="stat-value${cls ? " " + cls : ""}">${val}</span><span class="stat-label">${label}</span></div>`;
+    // las tarjetas grandes son para valores numéricos; los textos van a la tabla
     $tf("tls-stats").innerHTML =
       t("Días restantes", c.days_left !== undefined ? c.days_left : "—", daysCls) +
-      t("Emisor", esc(c.issuer || "—")) +
-      t("Protocolo", esc(res.tls_proto || "—")) +
-      t("Cipher", esc(res.cipher || "—"));
+      t("Handshake", res.handshake_ms !== undefined ? res.handshake_ms + " ms" : "—");
 
     const row = (k, v) => `<tr><td style="width:30%;opacity:.8">${k}</td><td>${v}</td></tr>`;
     $tf("tls-rows").innerHTML = [
+      row("Emisor", esc(c.issuer || "—")),
+      row("Protocolo", esc(res.tls_proto || "—")),
+      row("Cipher", esc(res.cipher || "—")),
       row("Sujeto", esc(c.subject || "—")),
       row("SANs", esc((c.sans || []).join(", ") || "—")),
       row("Válido desde", esc(c.not_before || "—")),
