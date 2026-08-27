@@ -1137,7 +1137,7 @@ if (document.getElementById("user-list")) {
 // --- herramientas: pestañas ---
 const toolsTabs = document.getElementById("tools-tabs");
 if (toolsTabs) {
-  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns" };
+  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http" };
   const saved = localStorage.getItem("akena_tool_tab");
   const switchTab = (name) => {
     $$(".tab", toolsTabs).forEach((b) => {
@@ -1381,4 +1381,80 @@ if (dnsTool) {
       btn.textContent = "Consultar";
     }
   });
+}
+
+// --- herramientas: inspección HTTP ---
+const httpTool = document.getElementById("http-tool");
+if (httpTool) {
+  const $hf = (id) => document.getElementById(id);
+
+  $hf("http-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = $hf("http-btn");
+    btn.disabled = true;
+    btn.textContent = "Inspeccionando…";
+    $hf("http-error").classList.add("hidden");
+    $hf("http-result").classList.add("hidden");
+
+    // headers extra: una por línea, formato "Nombre: valor"
+    const headers = {};
+    (fd.get("headers") || "").split("\n").forEach((line) => {
+      const i = line.indexOf(":");
+      if (i > 0) headers[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    });
+
+    try {
+      const res = await api("/api/httpcheck", {
+        method: "POST",
+        body: JSON.stringify({
+          url: fd.get("url").trim(),
+          method: fd.get("method"),
+          headers,
+          body: fd.get("body") || "",
+        }),
+      });
+      renderHTTPResult(res);
+    } catch (err) {
+      const box = $hf("http-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Inspeccionar";
+    }
+  });
+
+  function renderHTTPResult(res) {
+    const ok = res.status >= 200 && res.status < 400;
+    $hf("http-summary").innerHTML =
+      `${esc(res.method)} ${esc(res.final_url || res.url)} ` +
+      `<span class="badge${ok ? "" : " amber"}">${esc(res.status_text || res.status || "")}</span>` +
+      (res.total_ms !== undefined ? ` · ${res.total_ms.toFixed(1)} ms total` : "") +
+      (res.error ? `<div class="error-text">⚠️ ${esc(res.error)}</div>` : "");
+
+    const t = (label, ms) =>
+      `<div class="stat-card"><span class="stat-value">${ms && ms > 0 ? ms.toFixed(1) + " ms" : "—"}</span><span class="stat-label">${label}</span></div>`;
+    $hf("http-timings").innerHTML =
+      t("DNS", res.dns_ms) + t("Conexión", res.connect_ms) + t("TLS", res.tls_ms) +
+      t("TTFB", res.ttfb_ms) + t("Total", res.total_ms);
+
+    $hf("http-redirects").innerHTML = res.redirects && res.redirects.length
+      ? "<p class=\"field-note\">Redirecciones</p>" +
+        res.redirects.map((rd, i) =>
+          `<div class="muted small">${i + 1}. ${esc(rd.status)} → ${esc(rd.url)}</div>`).join("")
+      : "";
+
+    $hf("http-cert").innerHTML = res.cert && res.cert.subject
+      ? `🔒 TLS ${esc(res.tls_proto || "")} · certificado: ${esc(res.cert.subject)} — expira ${esc(res.cert.expires)} ` +
+        `<span class="badge${res.cert.days_left <= 14 ? " amber" : ""}">${res.cert.days_left} días</span>`
+      : "";
+
+    $hf("http-headers").innerHTML = Object.entries(res.headers || {}).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+
+    $hf("http-body-meta").textContent = res.body_len !== undefined ? `(${res.body_len} bytes leídos)` : "";
+    $hf("http-body").textContent = res.body_preview || "(cuerpo vacío)";
+    $hf("http-result").classList.remove("hidden");
+  }
 }

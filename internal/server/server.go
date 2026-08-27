@@ -92,6 +92,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/statuspage", s.authJSON(s.handleUpdateStatusPage))
 	mux.HandleFunc("GET /api/whois", s.authJSON(s.handleWhois))
 	mux.HandleFunc("GET /api/dns", s.authJSON(s.handleDNSLookup))
+	mux.HandleFunc("POST /api/httpcheck", s.authJSON(s.handleHTTPCheck))
 
 	staticFS, err := fs.Sub(web.FS, "static")
 	if err != nil {
