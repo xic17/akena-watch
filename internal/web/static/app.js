@@ -343,6 +343,7 @@ if (document.getElementById("monitor-list")) {
           <button class="btn tiny ghost" type="button" onclick="openMonitorDetails(${m.id})">Detalles</button>
           <button class="btn tiny ghost" type="button" onclick="testMonitor(${m.id}, this)">Probar</button>
           ${canEditClient(m) ? `<button class="btn tiny ghost" type="button" onclick="openMonitorModal(${m.id})">Editar</button>` : ""}
+          ${canEditClient(m) ? `<button class="btn tiny ghost" type="button" title="Duplicar monitor" onclick="duplicateMonitor(${m.id})">Duplicar</button>` : ""}
           ${m.owner_id === ME_ID || ME_IS_ADMIN ? `<button class="btn tiny danger" type="button" onclick="deleteMonitor(${m.id})">Borrar</button>` : ""}
         </div>
       </div>`;
@@ -571,6 +572,19 @@ if (document.getElementById("monitor-list")) {
       renderSummary();
       renderMonitors();
       toast(target ? "Monitor pausado" : "Monitor reanudado");
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  };
+
+  // duplicar un monitor (configuración + canales, nombre con "(copia)")
+  window.duplicateMonitor = async (id) => {
+    try {
+      const res = await api(`/api/monitors/${id}/duplicate`, { method: "POST" });
+      MONITORS.push(res.monitor);
+      renderSummary();
+      renderMonitors();
+      toast("Monitor duplicado");
     } catch (err) {
       toast(err.message, "bad");
     }

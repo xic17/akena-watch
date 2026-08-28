@@ -415,6 +415,53 @@ func (s *Server) handleSetMonitorActive(w http.ResponseWriter, r *http.Request) 
 	writeOK(w, map[string]any{"monitor": p})
 }
 
+// handleDuplicateMonitor clona un monitor (configuración + canales) con el
+// sufijo "(copia)" en el nombre. No copia comparticiones: el clon pertenece
+// al mismo propietario y habrá que compartirlo de nuevo si hace falta.
+func (s *Server) handleDuplicateMonitor(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	id, err := parseID(r, "id")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	canEdit, err := s.st.CanEditMonitor(u.ID, id, u.IsAdmin())
+	if err != nil || !canEdit {
+		writeErr(w, http.StatusForbidden, "no tienes permiso para modificar este monitor")
+		return
+	}
+	m, err := s.st.GetMonitor(id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "monitor no encontrado")
+		return
+	}
+	const suffix = " (copia)"
+	base := m.Name
+	if maxBase := 64 - len(suffix); len(base) > maxBase {
+		base = base[:maxBase]
+	}
+	m.ID = 0
+	m.Name = base + suffix
+	created, err := s.st.CreateMonitor(m)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "no se pudo duplicar el monitor")
+		return
+	}
+	// copia las asociaciones de canales del original
+	if notifs, err := s.st.ListNotificationsForMonitor(id); err == nil {
+		ids := make([]int64, 0, len(notifs))
+		for _, n := range notifs {
+			ids = append(ids, n.ID)
+		}
+		if err := s.st.SetMonitorNotifiers(created.ID, ids); err != nil {
+			writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
+			return
+		}
+	}
+	p, _ := s.monitorPayload(store.MonitorWithOwner{Monitor: created, OwnerName: u.Username})
+	writeOK(w, map[string]any{"monitor": p})
+}
+
 func (s *Server) handleDeleteMonitor(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	id, err := parseID(r, "id")

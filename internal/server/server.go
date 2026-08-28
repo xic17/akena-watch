@@ -71,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/monitors/{id}/active", s.authJSON(s.handleSetMonitorActive))
 	mux.HandleFunc("DELETE /api/monitors/{id}", s.authJSON(s.handleDeleteMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/test", s.authJSON(s.handleTestMonitor))
+	mux.HandleFunc("POST /api/monitors/{id}/duplicate", s.authJSON(s.handleDuplicateMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}/heartbeats", s.authJSON(s.handleHeartbeats))
 	mux.HandleFunc("GET /api/monitors/{id}/stats", s.authJSON(s.handleMonitorStats))
 	mux.HandleFunc("GET /api/heartbeats", s.authJSON(s.handleAllHeartbeats))
