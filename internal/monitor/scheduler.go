@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -34,6 +35,8 @@ type monState struct {
 	status              string // "up" | "down" | "" (sin historial)
 	consecutiveFailures int
 	downAlerted         bool
+	slowStreak          int // checks consecutivos por encima del umbral
+	slowAlerted         bool
 }
 
 // NewScheduler crea un scheduler. Hub puede ser nil (sin tiempo real).
@@ -159,6 +162,27 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 	transition := st.status != "" && st.status != res.Status
 	st.status = res.Status
 
+	// lentitud: la latencia por encima del umbral durante slow_retries
+	// checks seguidos (con estado up) dispara una alerta única.
+	slow := m.LatencyThresholdMS > 0 && res.Status == store.StatusUp && res.LatencyMS >= m.LatencyThresholdMS
+	if slow {
+		st.slowStreak++
+	} else {
+		st.slowStreak = 0
+		st.slowAlerted = false
+	}
+	slowAlerted := slow && st.slowStreak >= m.SlowRetries
+	if slowAlerted && !st.slowAlerted && s.notify != nil {
+		st.slowAlerted = true
+		detail := fmt.Sprintf("lento: %d ms (umbral %d ms)", res.LatencyMS, m.LatencyThresholdMS)
+		if m.Notify {
+			go s.notify.SendSlow(m, detail, res.LatencyMS, hb.CheckedAt)
+		}
+		if m.NotifyOwner {
+			s.notify.NotifyOwnerSlow(m, detail, res.LatencyMS, hb.CheckedAt)
+		}
+	}
+
 	if s.notify != nil {
 		if res.Status == store.StatusDown && st.consecutiveFailures >= m.MaxRetries && !st.downAlerted {
 			st.downAlerted = true
@@ -192,6 +216,7 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 					"name":       m.Name,
 					"status":     res.Status,
 					"latency_ms": res.LatencyMS,
+					"slow":       slowAlerted,
 					"error":      res.Error,
 					"checked_at": hb.CheckedAt.Format(time.RFC3339),
 				},

@@ -33,6 +33,11 @@ type Monitor struct {
 	Notify         bool
 	NotifyOwner    bool // avisar al propietario por su Telegram del perfil
 	MaxRetries     int
+	// Umbral de lentitud: si la latencia supera latency_threshold_ms durante
+	// slow_retries checks consecutivos (con estado up), se alerta como "lento".
+	// 0 = desactivado.
+	LatencyThresholdMS int
+	SlowRetries        int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -56,11 +61,13 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	now := nowStr()
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, group_name, type, url, method, expected_status, keyword,
-		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries,
+		 latency_threshold_ms, slow_retries, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
-		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, now, now)
+		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
+		m.LatencyThresholdMS, m.SlowRetries, now, now)
 	if err != nil {
 		return Monitor{}, err
 	}
@@ -74,11 +81,13 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, group_name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
-		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?, updated_at=?
+		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?,
+		 latency_threshold_ms=?, slow_retries=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
-		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries, nowStr(), m.ID)
+		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
+		m.LatencyThresholdMS, m.SlowRetries, nowStr(), m.ID)
 	return err
 }
 
@@ -300,7 +309,7 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 
 const monitorCols = `m.id, m.owner_id, m.name, m.group_name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
-	m.notify_owner, m.max_retries, m.created_at, m.updated_at`
+	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
@@ -308,7 +317,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	var createdAt, updatedAt string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&createdAt, &updatedAt)
+		&m.LatencyThresholdMS, &m.SlowRetries, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
 	}
@@ -337,7 +346,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&createdAt, &updatedAt, &owner)
+		&m.LatencyThresholdMS, &m.SlowRetries, &createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound
 	}

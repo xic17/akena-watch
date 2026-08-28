@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"akena-watch/internal/store"
 )
 
 // handleGetStatusPage devuelve la configuración de la página de estado
@@ -85,6 +87,8 @@ func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
 				item["latency_ms"] = hb.LatencyMS
 				item["error"] = hb.Error
 				item["last_checked"] = hb.CheckedAt.Format("2006-01-02T15:04:05Z07:00")
+				item["slow"] = m.LatencyThresholdMS > 0 && hb.Status == store.StatusUp &&
+					hb.LatencyMS >= m.LatencyThresholdMS
 			}
 			if up, total, err := s.st.Uptime(m.ID, nowMinus(30*24*time.Hour)); err == nil && total > 0 {
 				item["uptime_30d"] = round2(float64(up) / float64(total) * 100)

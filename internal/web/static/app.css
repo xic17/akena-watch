@@ -264,6 +264,8 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .dot.up { background: var(--green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
 .dot.down { background: var(--red); box-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
+.dot.slow { background: var(--amber); box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+.slow-text { color: var(--amber-strong); }
 
 .badge {
   font-size: 11px;
@@ -279,6 +281,7 @@ textarea { resize: vertical; min-height: 70px; }
 .badge.amber { color: var(--amber-strong); border-color: var(--amber); background: var(--amber-dim); }
 .badge.group { color: var(--green); border-color: var(--green); background: rgba(52, 211, 153, 0.08); }
 .badge.paused { color: var(--muted); border-color: var(--border); background: var(--panel); }
+.badge.slow { color: var(--amber-strong); border-color: var(--amber); background: var(--amber-dim); }
 
 /* monitor pausado: fila atenuada, sin luces de estado */
 .monitor-row.paused { opacity: 0.72; }

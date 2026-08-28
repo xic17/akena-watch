@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS monitors (
 	notify           INTEGER NOT NULL DEFAULT 1,
 	notify_owner     INTEGER NOT NULL DEFAULT 0,
 	max_retries      INTEGER NOT NULL DEFAULT 1,
+	latency_threshold_ms INTEGER NOT NULL DEFAULT 0,
+	slow_retries     INTEGER NOT NULL DEFAULT 0,
 	created_at       TEXT NOT NULL,
 	updated_at       TEXT NOT NULL
 );
@@ -139,6 +141,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateMonitorsNotifyOwner(); err != nil {
+		return err
+	}
+	if err := s.migrateMonitorsLatency(); err != nil {
 		return err
 	}
 	return s.migrateMonitorsGroup()
@@ -246,6 +251,46 @@ func (s *Store) migrateMonitorsBody() error {
 	}
 	_, err = s.db.Exec("ALTER TABLE monitors ADD COLUMN body TEXT NOT NULL DEFAULT ''")
 	return err
+}
+
+// migrateMonitorsLatency añade el umbral de lentitud y los reintentos de
+// lentitud (0 = desactivado) a bases de datos creadas antes de esta función.
+func (s *Store) migrateMonitorsLatency() error {
+	for _, col := range []struct {
+		name string
+		def  string
+	}{
+		{"latency_threshold_ms", "0"},
+		{"slow_retries", "0"},
+	} {
+		rows, err := s.db.Query("PRAGMA table_info(monitors)")
+		if err != nil {
+			return err
+		}
+		found := false
+		for rows.Next() {
+			var cid, notnull, pk int
+			var name, ctype string
+			var dflt any
+			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+				rows.Close()
+				return err
+			}
+			if name == col.name {
+				found = true
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if !found {
+			if _, err := s.db.Exec("ALTER TABLE monitors ADD COLUMN " + col.name + " INTEGER NOT NULL DEFAULT " + col.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func nowStr() string { return time.Now().UTC().Format(timeFmt) }

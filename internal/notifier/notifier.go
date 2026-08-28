@@ -94,6 +94,51 @@ func formatMessage(mon store.Monitor, detail string, latencyMS int, at time.Time
 	return b.String()
 }
 
+// SendSlow notifica que el monitor lleva varios checks por encima del umbral
+// de lentitud. recovery=false no aplica: es un estado intermedio, no una caída.
+func (m *Manager) SendSlow(mon store.Monitor, detail string, latencyMS int, at time.Time) {
+	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
+	if err != nil || len(channels) == 0 {
+		return
+	}
+	text := formatSlowMessage(mon, detail, latencyMS, at)
+	v := vars{
+		MonitorName: mon.Name,
+		MonitorURL:  mon.URL,
+		MonitorType: mon.Type,
+		Status:      "slow",
+		Msg:         detail,
+		Time:        at.Format(time.RFC3339),
+		Localtime:   at.Local().Format("02/01/2006 15:04:05"),
+	}
+	if latencyMS > 0 {
+		v.Latency = fmt.Sprintf("%d ms", latencyMS)
+	}
+	for _, ch := range channels {
+		go func(ch store.Notification) {
+			if err := sendChannel(ch, text, v); err != nil {
+				log.Printf("alerta lenta %q (canal %s): %v", ch.Name, ch.Type, err)
+			}
+		}(ch)
+	}
+}
+
+func formatSlowMessage(mon store.Monitor, detail string, latencyMS int, at time.Time) string {
+	if detail == "" {
+		detail = "latencia por encima del umbral"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "🟡 *Akena Watch — Monitor lento*\n")
+	fmt.Fprintf(&b, "Monitor: *%s* (%s)\n", mon.Name, mon.Type)
+	fmt.Fprintf(&b, "Destino: %s\n", mon.URL)
+	fmt.Fprintf(&b, "Detalle: %s\n", detail)
+	if latencyMS > 0 {
+		fmt.Fprintf(&b, "Latencia: %d ms\n", latencyMS)
+	}
+	fmt.Fprintf(&b, "Hora: %s", at.Local().Format("02/01/2006 15:04:05"))
+	return b.String()
+}
+
 // Test envía un mensaje de prueba por el canal indicado, sin tocar
 // ningún monitor. Se usa desde el botón "Probar" de la interfaz.
 // Las variables de la plantilla se rellenan con valores de ejemplo
@@ -118,6 +163,15 @@ const testMessage = "🧪 Prueba de canal de Akena Watch — si recibes esto, to
 // del monitor (su ID de perfil), usando el bot de su primer canal de
 // Telegram. Se ignora en silencio si no hay ID o canal configurado.
 func (m *Manager) NotifyOwner(mon store.Monitor, detail string, latencyMS int, at time.Time, recovery bool) {
+	m.notifyOwnerText(mon, formatMessage(mon, detail, latencyMS, at, recovery), at)
+}
+
+// NotifyOwnerSlow envía el aviso de lentitud al Telegram del propietario.
+func (m *Manager) NotifyOwnerSlow(mon store.Monitor, detail string, latencyMS int, at time.Time) {
+	m.notifyOwnerText(mon, formatSlowMessage(mon, detail, latencyMS, at), at)
+}
+
+func (m *Manager) notifyOwnerText(mon store.Monitor, text string, at time.Time) {
 	owner, err := m.st.GetUserByID(mon.OwnerID)
 	if err != nil || strings.TrimSpace(owner.TelegramID) == "" {
 		return
@@ -133,7 +187,6 @@ func (m *Manager) NotifyOwner(mon store.Monitor, detail string, latencyMS int, a
 	if cfg.BotToken == "" {
 		return
 	}
-	text := formatMessage(mon, detail, latencyMS, at, recovery)
 	go func() {
 		client := &http.Client{Timeout: 15 * time.Second}
 		if err := sendTelegramMsg(client, cfg.BotToken, owner.TelegramID, text); err != nil {

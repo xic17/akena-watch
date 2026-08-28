@@ -32,6 +32,10 @@ type monitorInput struct {
 	NotifyOwner    *bool   `json:"notify_owner"`
 	MaxRetries     int     `json:"max_retries"`
 	NotifierIDs    []int64 `json:"notifier_ids"`
+	// 0 = desactivado; si la latencia supera el umbral durante slow_retries
+	// checks consecutivos (con estado up), se alerta como "lento".
+	LatencyThresholdMS int `json:"latency_threshold_ms"`
+	SlowRetries        int `json:"slow_retries"`
 }
 
 // toMonitor valida la entrada y aplica valores por defecto.
@@ -49,6 +53,8 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		TimeoutS:       in.TimeoutS,
 		IntervalS:      in.IntervalS,
 		MaxRetries:     in.MaxRetries,
+		LatencyThresholdMS: in.LatencyThresholdMS,
+		SlowRetries:        in.SlowRetries,
 	}
 	// Por defecto un monitor nuevo está activo y con alertas habilitadas.
 	m.Active = in.Active == nil || *in.Active
@@ -114,6 +120,12 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 	if m.MaxRetries < 1 || m.MaxRetries > 10 {
 		return m, errors.New("los reintentos deben estar entre 1 y 10")
 	}
+	if m.LatencyThresholdMS < 0 || m.LatencyThresholdMS > 60000 {
+		return m, errors.New("el umbral de lentitud debe estar entre 0 y 60000 ms")
+	}
+	if m.LatencyThresholdMS > 0 && (m.SlowRetries < 1 || m.SlowRetries > 10) {
+		return m, errors.New("los checks de lentitud deben estar entre 1 y 10")
+	}
 	return m, nil
 }
 
@@ -133,6 +145,8 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"timeout_s":      m.TimeoutS, "interval_s": m.IntervalS,
 		"active": m.Active, "public": m.Public, "notify": m.Notify, "notify_owner": m.NotifyOwner,
 		"max_retries": m.MaxRetries,
+		"latency_threshold_ms": m.LatencyThresholdMS,
+		"slow_retries":        m.SlowRetries,
 	}
 
 	now := time.Now()
@@ -147,6 +161,9 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 			"status": hb.Status, "code": hb.Code, "latency_ms": hb.LatencyMS,
 			"error": hb.Error, "checked_at": hb.CheckedAt.Format(time.RFC3339),
 		}
+		// estado "lento" derivado: latencia actual por encima del umbral
+		p["slow"] = m.LatencyThresholdMS > 0 && hb.Status == store.StatusUp &&
+			hb.LatencyMS >= m.LatencyThresholdMS
 	}
 	if shares, err := s.st.ListShares(m.ID); err == nil {
 		list := make([]map[string]any, 0, len(shares))
@@ -302,6 +319,8 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	cur.TimeoutS, cur.IntervalS = nm.TimeoutS, nm.IntervalS
 	cur.Active, cur.Public, cur.Notify, cur.MaxRetries = nm.Active, nm.Public, nm.Notify, nm.MaxRetries
 	cur.NotifyOwner = nm.NotifyOwner
+	cur.LatencyThresholdMS = nm.LatencyThresholdMS
+	cur.SlowRetries = nm.SlowRetries
 
 	if err := s.st.UpdateMonitor(cur); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")

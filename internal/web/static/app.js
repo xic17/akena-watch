@@ -181,14 +181,14 @@ if (STATUS_SLUG) {
       } else {
         list.innerHTML = data.monitors.map((m) => `
           <div class="card monitor-row${m.active === false ? " paused" : ""}">
-            <span class="dot ${m.active === false ? "" : m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
+            <span class="dot ${m.active === false ? "" : m.slow ? "slow" : m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
             <div class="monitor-main">
-              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span>${m.active === false ? '<span class="badge paused">pausado</span>' : ""}</div>
+              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span>${m.active === false ? '<span class="badge paused">pausado</span>' : ""}${m.slow ? '<span class="badge slow">lento</span>' : ""}</div>
               ${m.status === "down" && m.error && m.active !== false ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
               ${m.history ? `<div class="history-strip" title="Últimas 24 horas">${m.history.map((st) => `<span class="h-cell ${st}"></span>`).join("")}</div>` : ""}
             </div>
             <div class="monitor-stat">uptime 30 días<br><b>${m.uptime_30d !== undefined ? m.uptime_30d + "%" : "—"}</b></div>
-            <div class="monitor-stat">${m.active === false ? '<span class="muted">pausado</span>' : m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
+            <div class="monitor-stat">${m.active === false ? '<span class="muted">pausado</span>' : m.slow ? '<span class="slow-text">' + fmtLat(m.latency_ms) + "</span>" : m.status === "up" ? fmtLat(m.latency_ms) : m.status === "down" ? '<span class="error-text">caído</span>' : '<span class="muted">—</span>'}</div>
           </div>`).join("");
       }
       $("#sp-updated").textContent = new Date().toLocaleTimeString();
@@ -313,7 +313,8 @@ if (document.getElementById("monitor-list")) {
     }
     list.innerHTML = MONITORS.map((m) => {
       const lh = m.last_heartbeat;
-      const dot = !m.active ? "" : !lh ? "" : lh.status === "up" ? "up" : "down";
+      const slow = !!m.slow || (m.latency_threshold_ms > 0 && lh && lh.status === "up" && lh.latency_ms >= m.latency_threshold_ms);
+      const dot = !m.active ? "" : !lh ? "" : slow ? "slow" : lh.status === "up" ? "up" : "down";
       return `
       <div class="card monitor-row${m.active ? "" : " paused"}" data-id="${m.id}" data-status="${lh ? lh.status : ""}">
         <span class="dot ${dot}"></span>
@@ -324,6 +325,7 @@ if (document.getElementById("monitor-list")) {
             ${m.group ? `<span class="badge group">📁 ${esc(m.group)}</span>` : ""}
             ${m.public ? '<span class="badge amber">público</span>' : ""}
             ${!m.active ? '<span class="badge paused">pausado</span>' : ""}
+            ${slow ? '<span class="badge slow">lento</span>' : ""}
             ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
           </div>
           <div class="monitor-url muted small">${esc(m.url)}</div>
@@ -331,7 +333,7 @@ if (document.getElementById("monitor-list")) {
         </div>
         <div class="spark-wrap" data-cell="spark" title="Latencia · últimas 24 h">${sparklineSVG(pointsFor(m))}</div>
         <div class="monitor-stat" data-cell="latency">
-          ${!m.active ? '<span class="muted">pausado</span>' : !lh ? '<span class="muted">—</span>' : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
+          ${!m.active ? '<span class="muted">pausado</span>' : !lh ? '<span class="muted">—</span>' : slow ? `<span class="slow-text">${fmtLat(lh.latency_ms)}</span>` : lh.status === "up" ? fmtLat(lh.latency_ms) : '<span class="error-text">caído</span>'}
         </div>
         <div class="monitor-stat">uptime 24 h<br><b>${m.uptime_24h !== undefined ? m.uptime_24h + "%" : "—"}</b></div>
         <div class="monitor-stat" data-cell="last">último check<br><span class="muted small">${fmtTime(lh && lh.checked_at)}</span></div>
@@ -352,10 +354,23 @@ if (document.getElementById("monitor-list")) {
     const lh = { status: mon.status, latency_ms: mon.latency_ms, error: mon.error, checked_at: mon.checked_at };
     const m = MONITORS.find((x) => x.id === mon.id);
     if (m) m.last_heartbeat = lh;
+    const slow = !!mon.slow || (m && m.latency_threshold_ms > 0 && mon.status === "up" && mon.latency_ms >= m.latency_threshold_ms);
     row.dataset.status = mon.status;
-    $(".dot", row).className = "dot " + (mon.status === "up" ? "up" : "down");
+    const dotEl = $(".dot", row);
+    dotEl.className = "dot " + (slow ? "slow" : mon.status === "up" ? "up" : "down");
     const lat = $('[data-cell="latency"]', row);
-    lat.innerHTML = mon.status === "up" ? fmtLat(mon.latency_ms) : '<span class="error-text">caído</span>';
+    lat.innerHTML = slow ? `<span class="slow-text">${fmtLat(mon.latency_ms)}</span>`
+      : mon.status === "up" ? fmtLat(mon.latency_ms) : '<span class="error-text">caído</span>';
+    const nameEl = $(".monitor-name", row);
+    let slowBadge = nameEl.querySelector(".badge.slow");
+    if (slow && !slowBadge) {
+      const b = document.createElement("span");
+      b.className = "badge slow";
+      b.textContent = "lento";
+      nameEl.insertBefore(b, nameEl.querySelector(".badge").nextSibling);
+    } else if (!slow && slowBadge) {
+      slowBadge.remove();
+    }
     const last = $('[data-cell="last"]', row);
     last.innerHTML = 'último check<br><span class="muted small">' + fmtTime(mon.checked_at) + "</span>";
     let errCell = $(".monitor-url.error-text", row);
@@ -564,7 +579,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [] };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [], latency_threshold_ms: 0, slow_retries: 3 };
     const shares = (m && m.shares) || [];
     const activeNotifs = NOTIFS.filter((n) => n.active);
     const inactiveNotifs = NOTIFS.filter((n) => !n.active);
@@ -648,6 +663,22 @@ if (document.getElementById("monitor-list")) {
           </div>
         </div>
 
+        <div class="form-grid">
+          <div>
+            <label>Umbral de lentitud (ms)
+              <input name="latency_threshold_ms" type="number" min="0" max="60000" value="${f.latency_threshold_ms || 0}" title="0 = desactivado">
+            </label>
+          </div>
+          <div>
+            <label>Checks seguidos para avisar
+              <input name="slow_retries" type="number" min="1" max="10" value="${f.slow_retries || 3}">
+            </label>
+          </div>
+          <div class="full">
+            <p class="field-note">Si la latencia supera el umbral durante N checks seguidos (con estado "arriba"), se alerta como lento. 0 desactiva la función.</p>
+          </div>
+        </div>
+
         <label class="check-row"><input type="checkbox" name="active" ${f.active ? "checked" : ""}> Monitor activo</label>
         <label class="check-row"><input type="checkbox" name="notify" ${f.notify ? "checked" : ""}> Enviar alertas por los canales marcados</label>
         <label class="check-row"><input type="checkbox" name="notify_owner" ${f.notify_owner ? "checked" : ""}> Avisarme por Telegram (a mi ID del perfil)</label>
@@ -701,6 +732,8 @@ if (document.getElementById("monitor-list")) {
         timeout_s: parseInt(fd.get("timeout_s"), 10),
         interval_s: parseInt(fd.get("interval_s"), 10),
         max_retries: parseInt(fd.get("max_retries") || "1", 10),
+        latency_threshold_ms: parseInt(fd.get("latency_threshold_ms") || "0", 10),
+        slow_retries: parseInt(fd.get("slow_retries") || "3", 10),
         active: fd.get("active") === "on",
         notify: fd.get("notify") === "on",
         notify_owner: fd.get("notify_owner") === "on",
