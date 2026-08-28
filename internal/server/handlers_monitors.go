@@ -38,6 +38,11 @@ type monitorInput struct {
 	SlowRetries        int `json:"slow_retries"`
 	// 0 = desactivado; avisa cuando el certificado TLS expire en ≤ N días.
 	CertAlertDays int `json:"cert_alert_days"`
+	// Ventana de mantenimiento semanal (sin alertas mientras está activa).
+	MaintEnabled *bool  `json:"maint_enabled"`
+	MaintWeekday int    `json:"maint_weekday"`
+	MaintStart   string `json:"maint_start"`
+	MaintEnd     string `json:"maint_end"`
 }
 
 // toMonitor valida la entrada y aplica valores por defecto.
@@ -59,6 +64,12 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		SlowRetries:        in.SlowRetries,
 		CertAlertDays:      in.CertAlertDays,
 	}
+	if in.MaintEnabled != nil {
+		m.MaintEnabled = *in.MaintEnabled
+	}
+	m.MaintWeekday = in.MaintWeekday
+	m.MaintStart = strings.TrimSpace(in.MaintStart)
+	m.MaintEnd = strings.TrimSpace(in.MaintEnd)
 	// Por defecto un monitor nuevo está activo y con alertas habilitadas.
 	m.Active = in.Active == nil || *in.Active
 	m.Notify = in.Notify == nil || *in.Notify
@@ -132,6 +143,17 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 	if m.CertAlertDays < 0 || m.CertAlertDays > 365 {
 		return m, errors.New("el aviso de certificado debe estar entre 0 y 365 días")
 	}
+	if m.MaintEnabled {
+		if m.MaintWeekday < 0 || m.MaintWeekday > 6 {
+			return m, errors.New("el día de mantenimiento debe estar entre 0 (domingo) y 6 (sábado)")
+		}
+		if _, err := time.Parse("15:04", m.MaintStart); err != nil {
+			return m, errors.New("la hora de inicio de mantenimiento debe tener formato HH:MM")
+		}
+		if _, err := time.Parse("15:04", m.MaintEnd); err != nil {
+			return m, errors.New("la hora de fin de mantenimiento debe tener formato HH:MM")
+		}
+	}
 	return m, nil
 }
 
@@ -154,6 +176,11 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"latency_threshold_ms": m.LatencyThresholdMS,
 		"slow_retries":        m.SlowRetries,
 		"cert_alert_days":     m.CertAlertDays,
+		"maint_enabled":       m.MaintEnabled,
+		"maint_weekday":       m.MaintWeekday,
+		"maint_start":         m.MaintStart,
+		"maint_end":           m.MaintEnd,
+		"maint":               m.InMaintenance(time.Now()),
 	}
 
 	now := time.Now()
@@ -329,6 +356,8 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	cur.LatencyThresholdMS = nm.LatencyThresholdMS
 	cur.SlowRetries = nm.SlowRetries
 	cur.CertAlertDays = nm.CertAlertDays
+	cur.MaintEnabled, cur.MaintWeekday = nm.MaintEnabled, nm.MaintWeekday
+	cur.MaintStart, cur.MaintEnd = nm.MaintStart, nm.MaintEnd
 
 	if err := s.st.UpdateMonitor(cur); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")

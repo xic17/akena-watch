@@ -282,6 +282,7 @@ textarea { resize: vertical; min-height: 70px; }
 .badge.group { color: var(--green); border-color: var(--green); background: rgba(52, 211, 153, 0.08); }
 .badge.paused { color: var(--muted); border-color: var(--border); background: var(--panel); }
 .badge.slow { color: var(--amber-strong); border-color: var(--amber); background: var(--amber-dim); }
+.badge.maint { color: #60a5fa; border-color: #60a5fa; background: rgba(96, 165, 250, 0.1); }
 
 /* monitor pausado: fila atenuada, sin luces de estado */
 .monitor-row.paused { opacity: 0.72; }

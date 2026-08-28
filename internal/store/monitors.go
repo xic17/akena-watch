@@ -41,8 +41,15 @@ type Monitor struct {
 	// CertAlertDays: avisar una vez cuando el certificado TLS de un monitor
 	// HTTPS expire en menos de N días (0 = desactivado).
 	CertAlertDays int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// Ventana de mantenimiento semanal: mientras está activa no se envían
+	// alertas (los checks siguen corriendo y registrando historial).
+	// MaintWeekday sigue time.Weekday (0 = domingo). Horas en "HH:MM".
+	MaintEnabled bool
+	MaintWeekday  int
+	MaintStart    string
+	MaintEnd      string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // MonitorWithOwner agrega el nombre del propietario para listados.
@@ -65,12 +72,13 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, group_name, type, url, method, expected_status, keyword,
 		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries,
-		 latency_threshold_ms, slow_retries, cert_alert_days, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 latency_threshold_ms, slow_retries, cert_alert_days, maint_enabled, maint_weekday, maint_start, maint_end, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
-		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays, now, now)
+		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays,
+		boolInt(m.MaintEnabled), m.MaintWeekday, m.MaintStart, m.MaintEnd, now, now)
 	if err != nil {
 		return Monitor{}, err
 	}
@@ -85,12 +93,13 @@ func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, group_name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
 		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?,
-		 latency_threshold_ms=?, slow_retries=?, cert_alert_days=?, updated_at=?
+		 latency_threshold_ms=?, slow_retries=?, cert_alert_days=?, maint_enabled=?, maint_weekday=?, maint_start=?, maint_end=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
-		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays, nowStr(), m.ID)
+		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays,
+		boolInt(m.MaintEnabled), m.MaintWeekday, m.MaintStart, m.MaintEnd, nowStr(), m.ID)
 	return err
 }
 
@@ -312,15 +321,17 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 
 const monitorCols = `m.id, m.owner_id, m.name, m.group_name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
-	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.cert_alert_days, m.created_at, m.updated_at`
+	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.cert_alert_days,
+	m.maint_enabled, m.maint_weekday, m.maint_start, m.maint_end, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
-	var inv, act, pub, not, notOwner int
+	var inv, act, pub, not, notOwner, maint int
 	var createdAt, updatedAt string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays, &createdAt, &updatedAt)
+		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays,
+		&maint, &m.MaintWeekday, &m.MaintStart, &m.MaintEnd, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
 	}
@@ -332,6 +343,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	m.Public = pub == 1
 	m.Notify = not == 1
 	m.NotifyOwner = notOwner == 1
+	m.MaintEnabled = maint == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
 	return m, nil
@@ -344,12 +356,13 @@ type monitorRowScanner interface {
 
 func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var m Monitor
-	var inv, act, pub, not, notOwner int
+	var inv, act, pub, not, notOwner, maint int
 	var createdAt, updatedAt string
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays, &createdAt, &updatedAt, &owner)
+		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays,
+		&maint, &m.MaintWeekday, &m.MaintStart, &m.MaintEnd, &createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound
 	}
@@ -361,6 +374,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	m.Public = pub == 1
 	m.Notify = not == 1
 	m.NotifyOwner = notOwner == 1
+	m.MaintEnabled = maint == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
 	return MonitorWithOwner{Monitor: m, OwnerName: owner}, nil
@@ -371,4 +385,35 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// InMaintenance indica si el monitor está dentro de su ventana de
+// mantenimiento semanal (hora local del servidor). Una ventana puede cruzar
+// la medianoche (p. ej. domingo 23:00 → lunes 01:00).
+func (m Monitor) InMaintenance(now time.Time) bool {
+	if !m.MaintEnabled {
+		return false
+	}
+	start, err1 := time.Parse("15:04", m.MaintStart)
+	end, err2 := time.Parse("15:04", m.MaintEnd)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	local := now.Local()
+	nowMin := local.Hour()*60 + local.Minute()
+	startMin := start.Hour()*60 + start.Minute()
+	endMin := end.Hour()*60 + end.Minute()
+	if startMin == endMin {
+		return false // ventana vacía
+	}
+	if startMin < endMin {
+		return local.Weekday() == time.Weekday(m.MaintWeekday) &&
+			nowMin >= startMin && nowMin < endMin
+	}
+	// cruza la medianoche: la parte posterior pertenece al día siguiente
+	if local.Weekday() == time.Weekday(m.MaintWeekday) && nowMin >= startMin {
+		return true
+	}
+	next := (local.Weekday() + 1) % 7
+	return next == time.Weekday(m.MaintWeekday) && nowMin < endMin
 }

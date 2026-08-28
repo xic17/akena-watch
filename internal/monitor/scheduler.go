@@ -168,6 +168,18 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 	transition := st.status != "" && st.status != res.Status
 	st.status = res.Status
 
+	// ventana de mantenimiento: los checks y el estado interno siguen
+	// normales, pero no se envían alertas (y se rearman los flags para no
+	// perder futuras alertas). Si el monitor sigue caído al terminar la
+	// ventana, la alerta salta en el primer check posterior.
+	inMaint := m.InMaintenance(hb.CheckedAt)
+	if inMaint {
+		if res.Status == store.StatusUp {
+			st.downAlerted = false
+			st.slowAlerted = false
+		}
+	}
+
 	// lentitud: la latencia por encima del umbral durante slow_retries
 	// checks seguidos (con estado up) dispara una alerta única.
 	slow := m.LatencyThresholdMS > 0 && res.Status == store.StatusUp && res.LatencyMS >= m.LatencyThresholdMS
@@ -178,7 +190,7 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 		st.slowAlerted = false
 	}
 	slowAlerted := slow && st.slowStreak >= m.SlowRetries
-	if slowAlerted && !st.slowAlerted && s.notify != nil {
+	if slowAlerted && !inMaint && !st.slowAlerted && s.notify != nil {
 		st.slowAlerted = true
 		detail := fmt.Sprintf("lento: %d ms (umbral %d ms)", res.LatencyMS, m.LatencyThresholdMS)
 		if m.Notify {
@@ -193,7 +205,7 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 	// señal muy lenta) con aviso único cuando quedan menos días que el umbral.
 	if m.CertAlertDays > 0 && m.Type == store.TypeHTTP && time.Since(st.lastCertCheck) >= 24*time.Hour {
 		st.lastCertCheck = now
-		if days := certDaysLeft(m.URL); days >= 0 && days <= m.CertAlertDays && !st.certAlerted && s.notify != nil {
+		if days := certDaysLeft(m.URL); days >= 0 && days <= m.CertAlertDays && !inMaint && !st.certAlerted && s.notify != nil {
 			st.certAlerted = true
 			detail := "el certificado expira en " + fmt.Sprint(days) + " días"
 			if days < 0 {
@@ -213,21 +225,23 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 	}
 
 	if s.notify != nil {
-		if res.Status == store.StatusDown && st.consecutiveFailures >= m.MaxRetries && !st.downAlerted {
-			st.downAlerted = true
-			if m.Notify {
-				go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
-			}
-			if m.NotifyOwner {
-				s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
-			}
-		} else if res.Status == store.StatusUp && st.downAlerted {
-			st.downAlerted = false
-			if m.Notify {
-				go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
-			}
-			if m.NotifyOwner {
-				s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+		if !inMaint {
+			if res.Status == store.StatusDown && st.consecutiveFailures >= m.MaxRetries && !st.downAlerted {
+				st.downAlerted = true
+				if m.Notify {
+					go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
+				}
+				if m.NotifyOwner {
+					s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, false)
+				}
+			} else if res.Status == store.StatusUp && st.downAlerted {
+				st.downAlerted = false
+				if m.Notify {
+					go s.notify.Send(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+				}
+				if m.NotifyOwner {
+					s.notify.NotifyOwner(m, res.Error, res.LatencyMS, hb.CheckedAt, true)
+				}
 			}
 		}
 	}

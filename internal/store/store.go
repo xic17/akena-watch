@@ -83,6 +83,10 @@ CREATE TABLE IF NOT EXISTS monitors (
 	latency_threshold_ms INTEGER NOT NULL DEFAULT 0,
 	slow_retries     INTEGER NOT NULL DEFAULT 0,
 	cert_alert_days  INTEGER NOT NULL DEFAULT 0,
+	maint_enabled    INTEGER NOT NULL DEFAULT 0,
+	maint_weekday    INTEGER NOT NULL DEFAULT 0,
+	maint_start      TEXT NOT NULL DEFAULT '',
+	maint_end        TEXT NOT NULL DEFAULT '',
 	created_at       TEXT NOT NULL,
 	updated_at       TEXT NOT NULL
 );
@@ -148,6 +152,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateMonitorsCert(); err != nil {
+		return err
+	}
+	if err := s.migrateMonitorsMaint(); err != nil {
 		return err
 	}
 	return s.migrateMonitorsGroup()
@@ -325,6 +332,52 @@ func (s *Store) migrateMonitorsCert() error {
 		_, err = s.db.Exec("ALTER TABLE monitors ADD COLUMN cert_alert_days INTEGER NOT NULL DEFAULT 0")
 	}
 	return err
+}
+
+// migrateMonitorsMaint añade la ventana de mantenimiento semanal de los
+// monitores (maint_enabled, maint_weekday, maint_start, maint_end).
+func (s *Store) migrateMonitorsMaint() error {
+	cols := []struct {
+		name, def string
+	}{
+		{"maint_enabled", "0"},
+		{"maint_weekday", "0"},
+		{"maint_start", "''"},
+		{"maint_end", "''"},
+	}
+	for _, col := range cols {
+		rows, err := s.db.Query("PRAGMA table_info(monitors)")
+		if err != nil {
+			return err
+		}
+		found := false
+		for rows.Next() {
+			var cid, notnull, pk int
+			var name, ctype string
+			var dflt any
+			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+				rows.Close()
+				return err
+			}
+			if name == col.name {
+				found = true
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if !found {
+			kind := "INTEGER"
+			if col.name == "maint_start" || col.name == "maint_end" {
+				kind = "TEXT"
+			}
+			if _, err := s.db.Exec("ALTER TABLE monitors ADD COLUMN " + col.name + " " + kind + " NOT NULL DEFAULT " + col.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func nowStr() string { return time.Now().UTC().Format(timeFmt) }

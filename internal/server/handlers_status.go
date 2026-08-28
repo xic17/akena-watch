@@ -81,7 +81,7 @@ func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("json") == "1" {
 		out := make([]map[string]any, 0, len(mons))
 		for _, m := range mons {
-			item := map[string]any{"name": m.Name, "type": m.Type, "active": m.Active}
+			item := map[string]any{"name": m.Name, "type": m.Type, "active": m.Active, "maint": m.InMaintenance(time.Now())}
 			if hb, err := s.st.LatestHeartbeat(m.ID); err == nil && hb != nil {
 				item["status"] = hb.Status
 				item["latency_ms"] = hb.LatencyMS

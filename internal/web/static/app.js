@@ -183,7 +183,7 @@ if (STATUS_SLUG) {
           <div class="card monitor-row${m.active === false ? " paused" : ""}">
             <span class="dot ${m.active === false ? "" : m.slow ? "slow" : m.status === "up" ? "up" : m.status === "down" ? "down" : ""}"></span>
             <div class="monitor-main">
-              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span>${m.active === false ? '<span class="badge paused">pausado</span>' : ""}${m.slow ? '<span class="badge slow">lento</span>' : ""}</div>
+              <div class="monitor-name">${esc(m.name)} <span class="badge">${esc(m.type)}</span>${m.active === false ? '<span class="badge paused">pausado</span>' : ""}${m.slow ? '<span class="badge slow">lento</span>' : ""}${m.maint ? '<span class="badge maint">mantenimiento</span>' : ""}</div>
               ${m.status === "down" && m.error && m.active !== false ? `<div class="monitor-url error-text small">${esc(m.error)}</div>` : ""}
               ${m.history ? `<div class="history-strip" title="Últimas 24 horas">${m.history.map((st) => `<span class="h-cell ${st}"></span>`).join("")}</div>` : ""}
             </div>
@@ -326,6 +326,7 @@ if (document.getElementById("monitor-list")) {
             ${m.public ? '<span class="badge amber">público</span>' : ""}
             ${!m.active ? '<span class="badge paused">pausado</span>' : ""}
             ${slow ? '<span class="badge slow">lento</span>' : ""}
+            ${m.maint ? '<span class="badge maint">mantenimiento</span>' : ""}
             ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
           </div>
           <div class="monitor-url muted small">${esc(m.url)}</div>
@@ -579,7 +580,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [], latency_threshold_ms: 0, slow_retries: 3, cert_alert_days: 0 };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [], latency_threshold_ms: 0, slow_retries: 3, cert_alert_days: 0, maint_enabled: false, maint_weekday: 0, maint_start: "02:00", maint_end: "04:00" };
     const shares = (m && m.shares) || [];
     const activeNotifs = NOTIFS.filter((n) => n.active);
     const inactiveNotifs = NOTIFS.filter((n) => !n.active);
@@ -688,6 +689,30 @@ if (document.getElementById("monitor-list")) {
         <label class="check-row"><input type="checkbox" name="notify_owner" ${f.notify_owner ? "checked" : ""}> Avisarme por Telegram (a mi ID del perfil)</label>
         <label class="check-row"><input type="checkbox" name="public" ${f.public ? "checked" : ""}> Mostrar en la página de estado pública</label>
 
+        <div class="form-grid">
+          <div class="full">
+            <label class="check-row"><input type="checkbox" name="maint_enabled" ${f.maint_enabled ? "checked" : ""}> Ventana de mantenimiento (sin alertas)</label>
+          </div>
+          <div id="maint-fields" class="full ${f.maint_enabled ? "" : "hidden"}">
+            <div class="form-grid">
+              <label>Día
+                <select name="maint_weekday">
+                  ${["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].map((d, i) => `<option value="${i}" ${f.maint_weekday === i ? "selected" : ""}>${d}</option>`).join("")}
+                </select>
+              </label>
+              <label>Desde
+                <input name="maint_start" type="time" value="${esc(f.maint_start || "02:00")}">
+              </label>
+              <label>Hasta
+                <input name="maint_end" type="time" value="${esc(f.maint_end || "04:00")}">
+              </label>
+              <div class="full">
+                <p class="field-note">Durante la ventana no se envían alertas (caída, lentitud, certificado), pero los checks siguen registrando historial. Hora local del servidor.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <p class="field-note" style="margin-top:14px">Canales de alerta:</p>
         ${notifBoxes}
 
@@ -720,6 +745,13 @@ if (document.getElementById("monitor-list")) {
     };
     typeSel.addEventListener("change", toggleHttp);
 
+    // mostrar/ocultar los campos de la ventana de mantenimiento
+    const maintCheck = $('input[name="maint_enabled"]', $("#monitor-form"));
+    const maintFields = $("#maint-fields");
+    if (maintCheck && maintFields) {
+      maintCheck.addEventListener("change", () => maintFields.classList.toggle("hidden", !maintCheck.checked));
+    }
+
     $("#monitor-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -739,6 +771,10 @@ if (document.getElementById("monitor-list")) {
         latency_threshold_ms: parseInt(fd.get("latency_threshold_ms") || "0", 10),
         slow_retries: parseInt(fd.get("slow_retries") || "3", 10),
         cert_alert_days: parseInt(fd.get("cert_alert_days") || "0", 10),
+        maint_enabled: fd.get("maint_enabled") === "on",
+        maint_weekday: parseInt(fd.get("maint_weekday") || "0", 10),
+        maint_start: fd.get("maint_start") || "",
+        maint_end: fd.get("maint_end") || "",
         active: fd.get("active") === "on",
         notify: fd.get("notify") === "on",
         notify_owner: fd.get("notify_owner") === "on",
