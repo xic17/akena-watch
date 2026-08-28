@@ -579,7 +579,7 @@ if (document.getElementById("monitor-list")) {
   window.openMonitorModal = (id) => {
     const m = id ? MONITORS.find((x) => x.id === id) : null;
     const isEdit = !!m;
-    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [], latency_threshold_ms: 0, slow_retries: 3 };
+    const f = m || { type: "http", method: "GET", expected_status: 200, timeout_s: 10, interval_s: 60, max_retries: 1, active: true, notify: true, notify_owner: false, public: false, invert_keyword: false, body: "", group: "", notifier_ids: [], latency_threshold_ms: 0, slow_retries: 3, cert_alert_days: 0 };
     const shares = (m && m.shares) || [];
     const activeNotifs = NOTIFS.filter((n) => n.active);
     const inactiveNotifs = NOTIFS.filter((n) => !n.active);
@@ -646,6 +646,10 @@ if (document.getElementById("monitor-list")) {
               <input name="keyword" value="${esc(f.keyword || "")}" placeholder="buscar en la respuesta">
             </label>
             <label class="check-row"><input type="checkbox" name="invert_keyword" ${f.invert_keyword ? "checked" : ""}> Alertar si la palabra clave SÍ aparece</label>
+            <label>Avisar si el certificado expira en ≤ (días)
+              <input name="cert_alert_days" type="number" min="0" max="365" value="${f.cert_alert_days || 0}" title="0 = desactivado">
+            </label>
+            <p class="field-note">Comprueba el certificado TLS una vez por hora y avisa cuando queden menos días que el umbral.</p>
           </div>
           <div>
             <label>Timeout (segundos)
@@ -734,6 +738,7 @@ if (document.getElementById("monitor-list")) {
         max_retries: parseInt(fd.get("max_retries") || "1", 10),
         latency_threshold_ms: parseInt(fd.get("latency_threshold_ms") || "0", 10),
         slow_retries: parseInt(fd.get("slow_retries") || "3", 10),
+        cert_alert_days: parseInt(fd.get("cert_alert_days") || "0", 10),
         active: fd.get("active") === "on",
         notify: fd.get("notify") === "on",
         notify_owner: fd.get("notify_owner") === "on",

@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS monitors (
 	max_retries      INTEGER NOT NULL DEFAULT 1,
 	latency_threshold_ms INTEGER NOT NULL DEFAULT 0,
 	slow_retries     INTEGER NOT NULL DEFAULT 0,
+	cert_alert_days  INTEGER NOT NULL DEFAULT 0,
 	created_at       TEXT NOT NULL,
 	updated_at       TEXT NOT NULL
 );
@@ -144,6 +145,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if err := s.migrateMonitorsLatency(); err != nil {
+		return err
+	}
+	if err := s.migrateMonitorsCert(); err != nil {
 		return err
 	}
 	return s.migrateMonitorsGroup()
@@ -291,6 +295,36 @@ func (s *Store) migrateMonitorsLatency() error {
 		}
 	}
 	return nil
+}
+
+// migrateMonitorsCert añade la columna cert_alert_days (aviso de expiración
+// del certificado TLS, 0 = desactivado) a bases de datos previas.
+func (s *Store) migrateMonitorsCert() error {
+	rows, err := s.db.Query("PRAGMA table_info(monitors)")
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == "cert_alert_days" {
+			found = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !found {
+		_, err = s.db.Exec("ALTER TABLE monitors ADD COLUMN cert_alert_days INTEGER NOT NULL DEFAULT 0")
+	}
+	return err
 }
 
 func nowStr() string { return time.Now().UTC().Format(timeFmt) }

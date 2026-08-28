@@ -139,6 +139,50 @@ func formatSlowMessage(mon store.Monitor, detail string, latencyMS int, at time.
 	return b.String()
 }
 
+// SendCert notifica que el certificado TLS de un monitor HTTPS está a punto
+// de expirar (o ya expiró). {{status}} = "cert" en las plantillas.
+func (m *Manager) SendCert(mon store.Monitor, detail string, at time.Time) {
+	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
+	if err != nil || len(channels) == 0 {
+		return
+	}
+	text := formatCertMessage(mon, detail, at)
+	v := vars{
+		MonitorName: mon.Name,
+		MonitorURL:  mon.URL,
+		MonitorType: mon.Type,
+		Status:      "cert",
+		Msg:         detail,
+		Time:        at.Format(time.RFC3339),
+		Localtime:   at.Local().Format("02/01/2006 15:04:05"),
+	}
+	for _, ch := range channels {
+		go func(ch store.Notification) {
+			if err := sendChannel(ch, text, v); err != nil {
+				log.Printf("alerta de certificado %q (canal %s): %v", ch.Name, ch.Type, err)
+			}
+		}(ch)
+	}
+}
+
+func formatCertMessage(mon store.Monitor, detail string, at time.Time) string {
+	if detail == "" {
+		detail = "certificado a punto de expirar"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "🟠 *Akena Watch — Certificado por expirar*\n")
+	fmt.Fprintf(&b, "Monitor: *%s* (%s)\n", mon.Name, mon.Type)
+	fmt.Fprintf(&b, "Destino: %s\n", mon.URL)
+	fmt.Fprintf(&b, "Detalle: %s\n", detail)
+	fmt.Fprintf(&b, "Hora: %s", at.Local().Format("02/01/2006 15:04:05"))
+	return b.String()
+}
+
+// NotifyOwnerCert envía el aviso de certificado al Telegram del propietario.
+func (m *Manager) NotifyOwnerCert(mon store.Monitor, detail string, at time.Time) {
+	m.notifyOwnerText(mon, formatCertMessage(mon, detail, at), at)
+}
+
 // Test envía un mensaje de prueba por el canal indicado, sin tocar
 // ningún monitor. Se usa desde el botón "Probar" de la interfaz.
 // Las variables de la plantilla se rellenan con valores de ejemplo

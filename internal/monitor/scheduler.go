@@ -2,8 +2,12 @@ package monitor
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
+	"math"
+	"net"
+	"net/url"
 	"sync"
 	"time"
 
@@ -37,6 +41,8 @@ type monState struct {
 	downAlerted         bool
 	slowStreak          int // checks consecutivos por encima del umbral
 	slowAlerted         bool
+	lastCertCheck       time.Time // último sondeo del certificado TLS
+	certAlerted         bool
 }
 
 // NewScheduler crea un scheduler. Hub puede ser nil (sin tiempo real).
@@ -183,6 +189,29 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 		}
 	}
 
+	// expiración de certificado: sondeo a lo sumo una vez por hora (es una
+	// señal lenta) con aviso único cuando quedan menos días que el umbral.
+	if m.CertAlertDays > 0 && m.Type == store.TypeHTTP && time.Since(st.lastCertCheck) >= time.Hour {
+		st.lastCertCheck = now
+		if days := certDaysLeft(m.URL); days >= 0 && days <= m.CertAlertDays && !st.certAlerted && s.notify != nil {
+			st.certAlerted = true
+			detail := "el certificado expira en " + fmt.Sprint(days) + " días"
+			if days < 0 {
+				detail = "el certificado lleva expirado " + fmt.Sprint(-days) + " días"
+			} else if days == 0 {
+				detail = "el certificado expira HOY"
+			}
+			if m.Notify {
+				go s.notify.SendCert(m, detail, hb.CheckedAt)
+			}
+			if m.NotifyOwner {
+				s.notify.NotifyOwnerCert(m, detail, hb.CheckedAt)
+			}
+		} else if days > m.CertAlertDays {
+			st.certAlerted = false // renovado o aún lejos: se rearma el aviso
+		}
+	}
+
 	if s.notify != nil {
 		if res.Status == store.StatusDown && st.consecutiveFailures >= m.MaxRetries && !st.downAlerted {
 			st.downAlerted = true
@@ -223,4 +252,29 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 			})
 		}
 	}
+}
+
+// certDaysLeft devuelve los días (redondeados hacia arriba) que faltan para
+// la expiración del certificado TLS de una URL https; -1 si no se puede
+// comprobar (URL no https, host caído, sin certificado…).
+func certDaysLeft(rawURL string) int {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return -1
+	}
+	host, port := u.Host, "443"
+	if h, p, err := net.SplitHostPort(u.Host); err == nil {
+		host, port = h, p
+	}
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp",
+		net.JoinHostPort(host, port), &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		return -1
+	}
+	defer conn.Close()
+	state := conn.ConnectionState()
+	if len(state.PeerCertificates) == 0 {
+		return -1
+	}
+	return int(math.Ceil(time.Until(state.PeerCertificates[0].NotAfter).Hours() / 24))
 }

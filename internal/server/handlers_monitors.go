@@ -36,6 +36,8 @@ type monitorInput struct {
 	// checks consecutivos (con estado up), se alerta como "lento".
 	LatencyThresholdMS int `json:"latency_threshold_ms"`
 	SlowRetries        int `json:"slow_retries"`
+	// 0 = desactivado; avisa cuando el certificado TLS expire en ≤ N días.
+	CertAlertDays int `json:"cert_alert_days"`
 }
 
 // toMonitor valida la entrada y aplica valores por defecto.
@@ -55,6 +57,7 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		MaxRetries:     in.MaxRetries,
 		LatencyThresholdMS: in.LatencyThresholdMS,
 		SlowRetries:        in.SlowRetries,
+		CertAlertDays:      in.CertAlertDays,
 	}
 	// Por defecto un monitor nuevo está activo y con alertas habilitadas.
 	m.Active = in.Active == nil || *in.Active
@@ -126,6 +129,9 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 	if m.LatencyThresholdMS > 0 && (m.SlowRetries < 1 || m.SlowRetries > 10) {
 		return m, errors.New("los checks de lentitud deben estar entre 1 y 10")
 	}
+	if m.CertAlertDays < 0 || m.CertAlertDays > 365 {
+		return m, errors.New("el aviso de certificado debe estar entre 0 y 365 días")
+	}
 	return m, nil
 }
 
@@ -147,6 +153,7 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"max_retries": m.MaxRetries,
 		"latency_threshold_ms": m.LatencyThresholdMS,
 		"slow_retries":        m.SlowRetries,
+		"cert_alert_days":     m.CertAlertDays,
 	}
 
 	now := time.Now()
@@ -321,6 +328,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	cur.NotifyOwner = nm.NotifyOwner
 	cur.LatencyThresholdMS = nm.LatencyThresholdMS
 	cur.SlowRetries = nm.SlowRetries
+	cur.CertAlertDays = nm.CertAlertDays
 
 	if err := s.st.UpdateMonitor(cur); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")

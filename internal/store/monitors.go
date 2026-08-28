@@ -38,6 +38,9 @@ type Monitor struct {
 	// 0 = desactivado.
 	LatencyThresholdMS int
 	SlowRetries        int
+	// CertAlertDays: avisar una vez cuando el certificado TLS de un monitor
+	// HTTPS expire en menos de N días (0 = desactivado).
+	CertAlertDays int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -62,12 +65,12 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, group_name, type, url, method, expected_status, keyword,
 		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries,
-		 latency_threshold_ms, slow_retries, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 latency_threshold_ms, slow_retries, cert_alert_days, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
-		m.LatencyThresholdMS, m.SlowRetries, now, now)
+		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays, now, now)
 	if err != nil {
 		return Monitor{}, err
 	}
@@ -82,12 +85,12 @@ func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, group_name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
 		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?,
-		 latency_threshold_ms=?, slow_retries=?, updated_at=?
+		 latency_threshold_ms=?, slow_retries=?, cert_alert_days=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
-		m.LatencyThresholdMS, m.SlowRetries, nowStr(), m.ID)
+		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays, nowStr(), m.ID)
 	return err
 }
 
@@ -309,7 +312,7 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 
 const monitorCols = `m.id, m.owner_id, m.name, m.group_name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
-	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.created_at, m.updated_at`
+	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.cert_alert_days, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
@@ -317,7 +320,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	var createdAt, updatedAt string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&m.LatencyThresholdMS, &m.SlowRetries, &createdAt, &updatedAt)
+		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
 	}
@@ -346,7 +349,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
-		&m.LatencyThresholdMS, &m.SlowRetries, &createdAt, &updatedAt, &owner)
+		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays, &createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound
 	}
