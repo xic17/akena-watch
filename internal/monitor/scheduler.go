@@ -189,9 +189,9 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 		}
 	}
 
-	// expiración de certificado: sondeo a lo sumo una vez por hora (es una
-	// señal lenta) con aviso único cuando quedan menos días que el umbral.
-	if m.CertAlertDays > 0 && m.Type == store.TypeHTTP && time.Since(st.lastCertCheck) >= time.Hour {
+	// expiración de certificado: sondeo a lo sumo una vez al día (es una
+	// señal muy lenta) con aviso único cuando quedan menos días que el umbral.
+	if m.CertAlertDays > 0 && m.Type == store.TypeHTTP && time.Since(st.lastCertCheck) >= 24*time.Hour {
 		st.lastCertCheck = now
 		if days := certDaysLeft(m.URL); days >= 0 && days <= m.CertAlertDays && !st.certAlerted && s.notify != nil {
 			st.certAlerted = true

@@ -649,7 +649,7 @@ if (document.getElementById("monitor-list")) {
             <label>Avisar si el certificado expira en ≤ (días)
               <input name="cert_alert_days" type="number" min="0" max="365" value="${f.cert_alert_days || 0}" title="0 = desactivado">
             </label>
-            <p class="field-note">Comprueba el certificado TLS una vez por hora y avisa cuando queden menos días que el umbral.</p>
+            <p class="field-note">Comprueba el certificado TLS una vez al día y avisa cuando queden menos días que el umbral.</p>
           </div>
           <div>
             <label>Timeout (segundos)
