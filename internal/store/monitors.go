@@ -414,6 +414,6 @@ func (m Monitor) InMaintenance(now time.Time) bool {
 	if local.Weekday() == time.Weekday(m.MaintWeekday) && nowMin >= startMin {
 		return true
 	}
-	next := (local.Weekday() + 1) % 7
-	return next == time.Weekday(m.MaintWeekday) && nowMin < endMin
+	prev := (local.Weekday() + 6) % 7 // ayer
+	return prev == time.Weekday(m.MaintWeekday) && nowMin < endMin
 }
