@@ -8,6 +8,9 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
 
 > 🌐 **Sitio web y descargas**: <https://akenawatch.com> — landing,
 > enlaces a los binarios de cada release y documentación base.
+>
+> 📋 **Novedades**: consulta el [CHANGELOG](CHANGELOG.md) para ver los cambios
+> de cada versión.
 
 > 🐾 **En memoria de Akena.** Este proyecto nace como tributo a una compañera
 > mestiza que, durante más de nueve años, fue guardiana y familia. Su nombre vive
@@ -29,6 +32,12 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
 8. [Canales de alerta](#canales-de-alerta)
 9. [Página de estado pública](#página-de-estado-pública)
 10. [Herramientas](#herramientas)
+    - [Ping en tiempo real](#ping-en-tiempo-real)
+    - [Inspección HTTP](#inspección-http)
+    - [Certificado TLS](#certificado-tls)
+    - [Escaneo de puertos](#escaneo-de-puertos)
+    - [Whois](#whois)
+    - [DNS Lookup](#dns-lookup)
 11. [Configuración](#configuración)
 12. [Despliegue](#despliegue)
     - [Linux plano (systemd)](#linux-plano-systemd)
@@ -41,6 +50,7 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
 16. [Desarrollo](#desarrollo)
 17. [Roadmap](#roadmap)
 18. [Licencia](#licencia)
+19. [Autor](#autor)
 
 ---
 
@@ -63,9 +73,20 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
   (estado, latencia, gráfica y resumen).
 - **Alertas** por webhook genérico, **Telegram** y **email SMTP**, con botón de
   **prueba por canal** para validar la configuración.
-- **Herramientas**: sección de utilidades que se ejecutan desde el servidor —
-  **ping en tiempo real** (TCP o ICMP, con estadísticas y gráfica), **whois**
-  y **DNS lookup** (A, AAAA, CNAME, MX, NS, TXT, PTR).
+- **Detección de lentitud**: umbral de latencia por monitor y estado «lento» con
+  alerta única tras N checks consecutivos por encima del umbral.
+- **Aviso de expiración de certificado**: en monitores HTTP(S), alerta cuando al
+  certificado le quedan menos días que el umbral configurado (comprobación diaria).
+- **Ventana de mantenimiento semanal**: franjas sin alertas (con soporte de cruce
+  de medianoche) en las que los checks y el historial se conservan.
+- **Pausar, reanudar y duplicar** monitores desde el listado.
+- **Herramientas** (se ejecutan desde el servidor, en pestañas):
+  - **Ping en tiempo real** por WebSocket (TCP o ICMP, con estadísticas y gráfica).
+  - **Inspección HTTP**: tiempos desglosados (DNS, conexión, TLS, TTFB), cadena de
+    redirecciones, cabeceras, certificado y vista previa del cuerpo.
+  - **Certificado TLS**: validez, emisor, SANs, serie, algoritmos y días restantes.
+  - **Escaneo de puertos** TCP con perfiles o rango personalizado, servicio y latencia.
+  - **Whois** y **DNS Lookup** (A, AAAA, CNAME, MX, NS, TXT, PTR).
 - **Página de estado pública** por usuario, sin autenticación, con **historial
   visual de las últimas 24 horas** por monitor.
 - **Un solo binario**: el frontend está embebido (`go:embed`); no hay
@@ -228,6 +249,66 @@ Cada monitor se define con:
   canales de notificación asociados.
 - **Compartir** con otros usuarios: lectura o edición.
 
+### Detección de lentitud
+
+Además de `arriba` y `caído`, un monitor puede detectar **degradación**:
+
+- **Umbral de lentitud (ms)**: latencia a partir de la cual el servicio se
+  considera lento. `0` lo desactiva.
+- **Checks seguidos**: cuántos checks consecutivos por encima del umbral deben
+  producirse antes de avisar (default 3).
+
+Mientras se supera el umbral, el monitor muestra el estado **«lento»**
+(indicador ámbar, en el dashboard y en la página de estado pública) y, al
+alcanzar los checks configurados, envía una **alerta única** 🟡 por los canales
+asociados. Al normalizarse la latencia, el estado desaparece y el aviso se
+rearma. Aplica a los tres tipos de monitor (HTTP, TCP y DNS).
+
+### Aviso de expiración de certificado
+
+En monitores **HTTP(S)** se puede vigilar la caducidad del certificado TLS:
+
+- **Avisar si expira en ≤ (días)**: umbral en días. `0` lo desactiva.
+- El certificado se comprueba **una vez al día** (es una señal de evolución
+  lenta, no tiene sentido consultarla en cada check).
+- Cuando quedan menos días que el umbral, se envía una **alerta única** 🟠
+  indicando si expira hoy, en N días o si ya ha expirado.
+- Si el certificado se renueva (o vuelve a estar lejos del umbral), el aviso se
+  rearma para el siguiente ciclo.
+- Si el host está caído no se puede comprobar el certificado, por lo que no se
+  generan falsas alertas.
+
+### Ventana de mantenimiento
+
+Permite silenciar las alertas de un monitor durante una franja recurrente, sin
+dejar de vigilar el servicio:
+
+- **Día** de la semana y **franja horaria** (hora local del servidor).
+- Admite franjas que **cruzan la medianoche** (p. ej. domingo 23:00 → lunes
+  01:00).
+- Durante la ventana **no se envían alertas** (ni de caída, ni de lentitud, ni de
+  certificado), pero los **checks y el historial siguen intactos**: el uptime y
+  las gráficas no mienten.
+- Si el monitor sigue caído al terminar la ventana, la alerta se dispara en el
+  **siguiente check** (los reintentos se cuentan durante la ventana).
+- Mientras está activa, el monitor muestra la marca **«mantenimiento»** en el
+  dashboard y en la página de estado pública.
+
+### Pausar y reanudar
+
+Cada monitor se puede **pausar** desde el icono del listado. Un monitor pausado
+**no se comprueba ni alerta**, se muestra atenuado con la marca «pausado» y se
+refleja igual en la página de estado pública. Es la opción adecuada para
+desactivar un servicio que ya no existe; para mantenimientos puntuales es mejor
+la ventana de mantenimiento (conserva el historial).
+
+### Duplicar
+
+El botón **«Duplicar»** clona la configuración completa de un monitor —incluidos
+los canales de alerta— con el sufijo «(copia)» en el nombre. Las comparticiones
+no se copian, así que el clon queda a nombre del mismo propietario y se puede
+compartir por separado.
+
 El botón **Probar** ejecuta un check manual sin guardar nada en el historial.
 
 ## Canales de alerta
@@ -308,6 +389,49 @@ echo "net.ipv4.ping_group_range=0 2147483647" | sudo tee /etc/sysctl.d/99-ping.c
 # ⚠️ Se pierde al actualizar el binario: hay que repetirlo.
 sudo setcap cap_net_raw+ep /usr/local/bin/akena-watch
 ```
+
+### Inspección HTTP
+
+Lanza una petición desde el servidor, como un `curl`, y muestra el resultado
+completo (`POST /api/httpcheck`). Útil para diagnosticar por qué un monitor falla:
+¿es el DNS, el TLS, la aplicación?
+
+- **Petición configurable**: método (GET, POST, PUT, PATCH, DELETE, HEAD,
+  OPTIONS), cabeceras adicionales (una por línea, `Nombre: valor`) y cuerpo JSON
+  (se envía con `Content-Type: application/json` si no indicas otro).
+- **Tiempos desglosados**: DNS, conexión TCP, handshake TLS, TTFB (primer byte) y
+  total.
+- **Redirecciones**: cadena completa con el código de cada salto (hasta 10).
+- **Certificado**: protocolo TLS, sujeto, caducidad y días restantes.
+- **Cabeceras de respuesta** en tabla y **vista previa del cuerpo** (hasta 64 KB
+  leídos, 4 KB mostrados).
+- Timeout de 15 segundos por petición.
+
+### Certificado TLS
+
+Inspecciona el certificado de cualquier servidor (`POST /api/tlscheck`), con
+puerto configurable (por defecto 443):
+
+- **Estado**: válido, expira pronto (≤ 14 días), expirado o aún no válido.
+- **Días restantes** y **cadena** de certificados.
+- **Detalles**: emisor, protocolo y cifrado, sujeto, **SANs**, validez
+  (desde/hasta), número de serie, algoritmo de firma y tipo de clave (por
+  ejemplo `ECDSA P-256` o `RSA 2048 bits`).
+- Se conecta sin validar el certificado a propósito: permite ver certificados
+  caducados, autofirmados o que no coinciden con el host.
+- Si se consulta una IP, no se envía SNI (igual que un cliente real).
+
+### Escaneo de puertos
+
+Comprueba qué puertos TCP aceptan conexión en un host
+(`POST /api/portscan`), mediante conexión completa (no SYN), por lo que **no
+necesita privilegios**:
+
+- **Perfiles predefinidos**: puertos comunes (23 puertos), web, bases de datos.
+- **Rango personalizado** (máximo 1024 puertos por escaneo).
+- Muestra **servicio** asociado (ssh, http, https, mysql…) y **latencia** de cada
+  puerto abierto, con el total escaneado y el tiempo empleado.
+- 50 conexiones en paralelo con 700 ms de timeout por puerto.
 
 ### Whois
 
@@ -521,6 +645,8 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET/POST` | `/api/monitors` | sesión | Listar / crear |
 | `GET/PUT/DELETE` | `/api/monitors/{id}` | sesión + permiso | Consultar / editar / borrar |
 | `POST` | `/api/monitors/{id}/test` | sesión + ver | Check manual (sin guardar) |
+| `PUT` | `/api/monitors/{id}/active` | sesión + editar | Pausar (`false`) o reanudar (`true`) |
+| `POST` | `/api/monitors/{id}/duplicate` | sesión + editar | Duplicar monitor (config + canales) |
 | `GET` | `/api/monitors/{id}/heartbeats?hours=24` | sesión + ver | Historial de un monitor |
 | `GET` | `/api/monitors/{id}/stats` | sesión + ver | Estadísticas detalladas (uptime 24 h/7 d/30 d, latencia mín/avg/p95/máx, últimos eventos) |
 | `GET` | `/api/heartbeats?hours=24` | sesión | Heartbeats recientes de todos los monitores visibles (gráficas) |
@@ -540,6 +666,9 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `GET` | `/ws/ping` | sesión (cookie o `?token=`) | Herramienta de ping en tiempo real (mensajes JSON) |
 | `GET` | `/api/whois?domain=...` | sesión | Registro WHOIS de un dominio o IP |
 | `GET` | `/api/dns?host=...&type=...` | sesión | Registros DNS (A, AAAA, CNAME, MX, NS, TXT, PTR) |
+| `POST` | `/api/httpcheck` | sesión | Inspección HTTP (tiempos, redirecciones, cabeceras, cuerpo) |
+| `POST` | `/api/tlscheck` | sesión | Certificado TLS de un host:puerto |
+| `POST` | `/api/portscan` | sesión | Escaneo de puertos TCP |
 
 ## Seguridad
 

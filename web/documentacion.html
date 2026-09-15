@@ -156,6 +156,12 @@ AKENA_BIND=127.0.0.1 AKENA_PORT=8080 AKENA_DATA_DIR=/var/lib/akena ./akena-watch
               <strong>TCP</strong> y <strong>DNS</strong>.</li>
           <li>Se organizan en <strong>grupos</strong> para categorizarlos y asignar accesos.</li>
           <li>Intervalo configurable y botón "Probar" inmediato.</li>
+          <li><strong>Umbral de lentitud</strong>: estado "lento" y alerta cuando la latencia
+              supera el umbral durante varios checks seguidos.</li>
+          <li><strong>Aviso de expiración de certificado</strong> en monitores HTTP(S).</li>
+          <li><strong>Ventana de mantenimiento</strong> semanal: sin alertas en esa franja,
+              pero con el historial intacto.</li>
+          <li><strong>Pausar</strong>, <strong>reanudar</strong> y <strong>duplicar</strong> monitores.</li>
           <li>Detalles por monitor: uptime 24h/7d/30d, percentil 95, eventos y gráficas.</li>
         </ul>
 
@@ -210,6 +216,15 @@ docker run -d --name akena-watch -p 8080:8080 -v akena-data:/data akena-watch</c
         </p>
         <ul>
           <li><strong>Ping</strong>: en tiempo real por WebSocket, con opción TCP/ICMP.</li>
+          <li><strong>Inspección HTTP</strong>: como un curl desde el servidor — tiempos
+              desglosados (DNS, conexión, TLS, TTFB), redirecciones, cabeceras,
+              certificado y vista previa del cuerpo. Admite método, cabeceras extra
+              y cuerpo JSON.</li>
+          <li><strong>Certificado TLS</strong>: validez, emisor, SANs, número de serie,
+              algoritmos, cadena y días restantes.</li>
+          <li><strong>Escaneo de puertos</strong>: puertos TCP abiertos con perfiles
+              (comunes, web, bases de datos) o rango personalizado, mostrando
+              servicio y latencia.</li>
           <li><strong>Whois</strong>: consulta de dominios.</li>
           <li><strong>DNS Lookup</strong>: resolución de registros.</li>
         </ul>
