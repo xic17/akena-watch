@@ -313,6 +313,7 @@ textarea { resize: vertical; min-height: 70px; }
   overflow-y: auto;
 }
 .modal { width: 100%; max-width: 560px; padding: 24px; }
+.modal.mid { max-width: 720px; }
 .modal.wide { max-width: 780px; }
 .modal h2 { margin: 0 0 4px; font-size: 19px; }
 .modal .modal-sub { margin: 0 0 14px; }

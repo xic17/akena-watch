@@ -56,7 +56,7 @@ function toast(msg, kind = "ok") {
 }
 
 // --- modal ---
-function openModal(html, wide) {
+function openModal(html, size) {
   // Si la página no define #modal-root (p. ej. Herramientas o Acerca de),
   // lo creamos sobre la marcha, igual que toast(): así el botón Perfil
   // funciona en cualquier página sin depender de la plantilla.
@@ -66,9 +66,13 @@ function openModal(html, wide) {
     root.id = "modal-root";
     document.body.appendChild(root);
   }
+  // size: true = ancho, "mid" = intermedio, "wide" = ancho, false/undefined = normal
+  let cls = "modal card";
+  if (size === true || size === "wide") cls += " wide";
+  else if (typeof size === "string" && size) cls += " " + size;
   root.innerHTML =
     '<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">' +
-    '<div class="modal card' + (wide ? " wide" : "") + '">' + html + "</div></div>";
+    '<div class="' + cls + '">' + html + "</div></div>";
   const first = $("#modal-root input, #modal-root select, #modal-root button");
   if (first) first.focus();
 }
@@ -748,7 +752,7 @@ if (document.getElementById("monitor-list")) {
         </div>
       </form>`;
 
-    openModal(html);
+    openModal(html, "mid");
 
     const typeSel = $("#m-type");
     const toggleHttp = () => {
