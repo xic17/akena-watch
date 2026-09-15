@@ -45,14 +45,14 @@ func (s *Server) handleHTTPCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		dnsMs, connMs, tlsMs, ttfbMs float64
+		dnsMs, connMs, tlsMs, ttfbMs  float64
 		dnsStart, connStart, tlsStart time.Time
-		tlsProto                     string
-		certSubject, certIssuer      string
-		certExpires                  string
-		certDays                     int
-		redirects                    []map[string]any
-		start                        = time.Now()
+		tlsProto                      string
+		certSubject, certIssuer       string
+		certExpires                   string
+		certDays                      int
+		redirects                     []map[string]any
+		start                         = time.Now()
 	)
 
 	trace := &httptrace.ClientTrace{
@@ -121,15 +121,15 @@ func (s *Server) handleHTTPCheck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// fallo de red: devolvemos lo que haya (cadena de redirecciones, tiempos)
 		writeOK(w, map[string]any{
-			"error":     err.Error(),
-			"url":       urlStr,
-			"method":    method,
-			"total_ms":  round2(totalMs),
-			"dns_ms":    round2(dnsMs),
+			"error":      err.Error(),
+			"url":        urlStr,
+			"method":     method,
+			"total_ms":   round2(totalMs),
+			"dns_ms":     round2(dnsMs),
 			"connect_ms": round2(connMs),
-			"tls_ms":    round2(tlsMs),
-			"ttfb_ms":   round2(ttfbMs),
-			"redirects": redirects,
+			"tls_ms":     round2(tlsMs),
+			"ttfb_ms":    round2(ttfbMs),
+			"redirects":  redirects,
 		})
 		return
 	}
@@ -148,21 +148,21 @@ func (s *Server) handleHTTPCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeOK(w, map[string]any{
-		"url":         urlStr,
-		"final_url":   resp.Request.URL.String(),
-		"method":      method,
-		"status":      resp.StatusCode,
-		"status_text": resp.Status,
-		"total_ms":    round2(totalMs),
-		"dns_ms":      round2(dnsMs),
-		"connect_ms":  round2(connMs),
-		"tls_ms":      round2(tlsMs),
-		"ttfb_ms":     round2(ttfbMs),
-		"redirects":   redirects,
-		"headers":     headers,
+		"url":          urlStr,
+		"final_url":    resp.Request.URL.String(),
+		"method":       method,
+		"status":       resp.StatusCode,
+		"status_text":  resp.Status,
+		"total_ms":     round2(totalMs),
+		"dns_ms":       round2(dnsMs),
+		"connect_ms":   round2(connMs),
+		"tls_ms":       round2(tlsMs),
+		"ttfb_ms":      round2(ttfbMs),
+		"redirects":    redirects,
+		"headers":      headers,
 		"body_preview": preview,
-		"body_len":    len(raw),
-		"tls_proto":   tlsProto,
+		"body_len":     len(raw),
+		"tls_proto":    tlsProto,
 		"cert": map[string]any{
 			"subject": certSubject, "issuer": certIssuer,
 			"expires": certExpires, "days_left": certDays,

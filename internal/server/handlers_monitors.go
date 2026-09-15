@@ -48,18 +48,18 @@ type monitorInput struct {
 // toMonitor valida la entrada y aplica valores por defecto.
 func (in monitorInput) toMonitor() (store.Monitor, error) {
 	m := store.Monitor{
-		Name:           strings.TrimSpace(in.Name),
-		Group:          strings.TrimSpace(in.Group),
-		Type:           in.Type,
-		URL:            strings.TrimSpace(in.URL),
-		Method:         strings.ToUpper(strings.TrimSpace(in.Method)),
-		ExpectedStatus: in.ExpectedStatus,
-		Keyword:        in.Keyword,
-		Body:           in.Body,
-		InvertKeyword:  in.InvertKeyword,
-		TimeoutS:       in.TimeoutS,
-		IntervalS:      in.IntervalS,
-		MaxRetries:     in.MaxRetries,
+		Name:               strings.TrimSpace(in.Name),
+		Group:              strings.TrimSpace(in.Group),
+		Type:               in.Type,
+		URL:                strings.TrimSpace(in.URL),
+		Method:             strings.ToUpper(strings.TrimSpace(in.Method)),
+		ExpectedStatus:     in.ExpectedStatus,
+		Keyword:            in.Keyword,
+		Body:               in.Body,
+		InvertKeyword:      in.InvertKeyword,
+		TimeoutS:           in.TimeoutS,
+		IntervalS:          in.IntervalS,
+		MaxRetries:         in.MaxRetries,
 		LatencyThresholdMS: in.LatencyThresholdMS,
 		SlowRetries:        in.SlowRetries,
 		CertAlertDays:      in.CertAlertDays,
@@ -172,15 +172,15 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"invert_keyword": m.InvertKeyword,
 		"timeout_s":      m.TimeoutS, "interval_s": m.IntervalS,
 		"active": m.Active, "public": m.Public, "notify": m.Notify, "notify_owner": m.NotifyOwner,
-		"max_retries": m.MaxRetries,
+		"max_retries":          m.MaxRetries,
 		"latency_threshold_ms": m.LatencyThresholdMS,
-		"slow_retries":        m.SlowRetries,
-		"cert_alert_days":     m.CertAlertDays,
-		"maint_enabled":       m.MaintEnabled,
-		"maint_weekday":       m.MaintWeekday,
-		"maint_start":         m.MaintStart,
-		"maint_end":           m.MaintEnd,
-		"maint":               m.InMaintenance(time.Now()),
+		"slow_retries":         m.SlowRetries,
+		"cert_alert_days":      m.CertAlertDays,
+		"maint_enabled":        m.MaintEnabled,
+		"maint_weekday":        m.MaintWeekday,
+		"maint_start":          m.MaintStart,
+		"maint_end":            m.MaintEnd,
+		"maint":                m.InMaintenance(time.Now()),
 	}
 
 	now := time.Now()
@@ -224,6 +224,34 @@ func (s *Server) monitorWithOwner(m store.Monitor) (store.MonitorWithOwner, erro
 		return store.MonitorWithOwner{}, err
 	}
 	return store.MonitorWithOwner{Monitor: m, OwnerName: u.Username}, nil
+}
+
+// filterNotifierIDs descarta los canales de alerta que no pertenecen ni al
+// usuario que está editando ni al propietario del monitor. Sin este filtro, un
+// colaborador con permiso de edición podría asociar el canal de otra persona
+// (su bot de Telegram o su webhook) y hacer que las alertas de su monitor
+// salieran por la cuenta ajena, con el nombre y la URL que él eligiera.
+func (s *Server) filterNotifierIDs(u *store.User, ownerID int64, ids []int64) []int64 {
+	if len(ids) == 0 {
+		return nil
+	}
+	permitidos := map[int64]bool{}
+	for _, dueno := range []int64{u.ID, ownerID} {
+		notifs, err := s.st.ListNotifications(dueno)
+		if err != nil {
+			continue
+		}
+		for _, n := range notifs {
+			permitidos[n.ID] = true
+		}
+	}
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if permitidos[id] {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // --- handlers ---
@@ -283,7 +311,7 @@ func (s *Server) handleCreateMonitor(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "no se pudo crear el monitor")
 		return
 	}
-	if err := s.st.SetMonitorNotifiers(created.ID, in.NotifierIDs); err != nil {
+	if err := s.st.SetMonitorNotifiers(created.ID, s.filterNotifierIDs(u, created.OwnerID, in.NotifierIDs)); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
 		return
 	}
@@ -363,7 +391,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "no se pudo actualizar el monitor")
 		return
 	}
-	if err := s.st.SetMonitorNotifiers(id, in.NotifierIDs); err != nil {
+	if err := s.st.SetMonitorNotifiers(id, s.filterNotifierIDs(u, cur.OwnerID, in.NotifierIDs)); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
 		return
 	}
@@ -453,7 +481,7 @@ func (s *Server) handleDuplicateMonitor(w http.ResponseWriter, r *http.Request) 
 		for _, n := range notifs {
 			ids = append(ids, n.ID)
 		}
-		if err := s.st.SetMonitorNotifiers(created.ID, ids); err != nil {
+		if err := s.st.SetMonitorNotifiers(created.ID, s.filterNotifierIDs(u, created.OwnerID, ids)); err != nil {
 			writeErr(w, http.StatusInternalServerError, "no se pudieron asociar los canales")
 			return
 		}

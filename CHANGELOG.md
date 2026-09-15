@@ -5,6 +5,45 @@ Todos los cambios notables de **Akena Watch — Siempre en Guardia**.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el
 proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Seguridad
+
+Auditoría completa del código y del historial antes de dar por publicada la
+versión. Los arreglos no cambian la forma de usar Akena Watch.
+
+- **Cookie de sesión `Secure` en HTTPS**: la cookie se marca `Secure` cuando la
+  petición llega por HTTPS (conexión directa o cabecera `X-Forwarded-Proto` de un
+  proxy inverso), para que no viaje por canales sin cifrar. En HTTP local (por
+  ejemplo `http://127.0.0.1:8080`) se mantiene sin `Secure`, de modo que el
+  acceso directo sigue funcionando.
+- **La lista de usuarios ya no expone datos personales**: `GET /api/users`
+  devolvía el correo y el ID de Telegram de todas las personas a cualquier
+  usuario autenticado. Ahora la ficha completa (correo, Telegram, grupos y
+  accesos) la recibe solo un administrador; el resto obtiene únicamente id,
+  nombre de usuario y rol —lo necesario para compartir monitores—.
+- **Se descartan los canales de alerta ajenos**: al crear o editar un monitor
+  solo se asocian canales que pertenecen al usuario que edita o al propietario
+  del monitor. Antes, un colaborador con permiso de edición podía asociar el bot
+  de Telegram o el webhook de otra persona y hacer que sus propias alertas
+  salieran por la cuenta ajena.
+- **`GET /api/groups` requiere rol de administrador**: antes, cualquier usuario
+  autenticado podía enumerar los nombres de todos los grupos del sistema.
+- **El instalador verifica el checksum de forma obligatoria**: `scripts/install.sh`
+  usa `curl -fsSL` (una respuesta 404 ya no se instala como si fuera el binario)
+  y aborta si no puede descargar o validar `SHA256SUMS`.
+
+### Corregido
+
+- **CI de nuevo en verde**: tres archivos (`internal/store/monitors.go`,
+  `internal/server/handlers_monitors.go` y
+  `internal/server/handlers_httpcheck.go`) incumplían `gofmt`, así que el flujo
+  de CI estaba en rojo. Solo cambia el formato: no hay cambios de
+  comportamiento.
+- **El instalador se adjunta a cada release**: el comando de una línea del
+  README descargaba `install.sh` desde los assets de la release, pero el flujo
+  de publicación no lo incluía (devolvía 404).
+
 ## [1.1.0] — 2026-09-15
 
 ### Añadido
@@ -181,6 +220,7 @@ se conservan.
 - Despliegue documentado en Linux (systemd), **CloudPanel 2** (reverse proxy),
   **Cloudflare Containers** y Docker.
 
+[Sin publicar]: https://github.com/xic17/akena-watch/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/xic17/akena-watch/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/xic17/akena-watch/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/xic17/akena-watch/compare/v1.0.5...v1.0.6

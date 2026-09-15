@@ -83,7 +83,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/notifications/{id}", s.authJSON(s.handleDeleteNotification))
 	mux.HandleFunc("POST /api/notifications/{id}/test", s.authJSON(s.handleTestNotification))
 	mux.HandleFunc("GET /api/users", s.authJSON(s.handleListUsers))
-	mux.HandleFunc("GET /api/groups", s.authJSON(s.handleListGroups))
+	mux.HandleFunc("GET /api/groups", s.authJSON(s.adminJSON(s.handleListGroups)))
 	mux.HandleFunc("POST /api/users", s.authJSON(s.adminJSON(s.handleCreateUser)))
 	mux.HandleFunc("PUT /api/users/{id}", s.authJSON(s.adminJSON(s.handleUpdateUser)))
 	mux.HandleFunc("DELETE /api/users/{id}", s.authJSON(s.adminJSON(s.handleDeleteUser)))

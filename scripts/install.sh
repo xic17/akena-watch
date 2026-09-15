@@ -49,7 +49,13 @@ case "$OS" in
 esac
 
 VERSION="${VERSION:-latest}"
-BASE="https://github.com/${REPO}/releases/${VERSION}"
+# GitHub usa /releases/latest/download/... para la última release y
+# /releases/download/<etiqueta>/... para una versión concreta.
+if [ "$VERSION" = "latest" ]; then
+  BASE="https://github.com/${REPO}/releases/latest/download"
+else
+  BASE="https://github.com/${REPO}/releases/download/${VERSION}"
+fi
 BIN_NAME="akena-watch-${OS}-${ARCH}"
 DEST="${AKENA_INSTALL_DIR:-/usr/local/bin}"
 DEST_BIN="${DEST}/akena-watch"
@@ -58,15 +64,22 @@ echo "==> Descargando ${BIN_NAME} (${VERSION}) desde ${REPO}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-curl -sSL -o "$TMP/$BIN_NAME" "$BASE/download/$BIN_NAME"
+curl -fsSL -o "$TMP/$BIN_NAME" "$BASE/$BIN_NAME" || {
+  echo "No se pudo descargar ${BIN_NAME} (${BASE}/${BIN_NAME})." >&2
+  exit 1
+}
 chmod +x "$TMP/$BIN_NAME"
 
-# verificación de checksum (si la release lo incluye)
-if curl -sSL -o "$TMP/SHA256SUMS" "$BASE/download/SHA256SUMS"; then
-  (cd "$TMP" && grep "$BIN_NAME" SHA256SUMS | sha256sum -c -) || {
-    echo "Checksum no válido. Abortando." >&2
-    exit 1
-  }
+# La verificación del checksum es obligatoria: sin ella no hay forma de saber
+# si el binario descargado es el que publicó la release. Si la release no trae
+# SHA256SUMS, se aborta.
+if ! curl -fsSL -o "$TMP/SHA256SUMS" "$BASE/SHA256SUMS"; then
+  echo "No se pudo descargar SHA256SUMS; se aborta la instalación por seguridad." >&2
+  exit 1
+fi
+if ! (cd "$TMP" && grep "$BIN_NAME" SHA256SUMS | sha256sum -c -); then
+  echo "Checksum no válido. Abortando." >&2
+  exit 1
 fi
 
 mkdir -p "$DEST"

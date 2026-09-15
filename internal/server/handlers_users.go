@@ -8,7 +8,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// handleListUsers devuelve la lista de usuarios. Los administradores reciben
+// la ficha completa (correo, Telegram, grupos y accesos); el resto de usuarios
+// solo la información mínima necesaria para compartir monitores (id, nombre de
+// usuario y rol), sin datos personales de terceros.
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
+	me := userFrom(r)
+	isAdmin := me != nil && me.IsAdmin()
 	users, err := s.st.ListUsers()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "error interno")
@@ -16,6 +22,12 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(users))
 	for _, u := range users {
+		if !isAdmin {
+			out = append(out, map[string]any{
+				"id": u.ID, "username": u.Username, "role": u.Role,
+			})
+			continue
+		}
 		n, err := s.st.CountMonitors(u.ID)
 		if err != nil {
 			n = 0

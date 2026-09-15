@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"akena-watch/internal/store"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -46,7 +47,7 @@ func userFrom(r *http.Request) *store.User {
 	return u
 }
 
-func (s *Server) startSession(w http.ResponseWriter, u store.User) error {
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u store.User) error {
 	token, err := newSessionToken()
 	if err != nil {
 		return err
@@ -60,9 +61,23 @@ func (s *Server) startSession(w http.ResponseWriter, u store.User) error {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   isHTTPS(r),
 		MaxAge:   int(sessionTTL.Seconds()),
 	})
 	return nil
+}
+
+// isHTTPS indica si la petición llegó por HTTPS (conexión directa o a través
+// de un proxy inverso que lo declare). Se usa para marcar la cookie de sesión
+// como Secure y evitar que viaje por canales sin cifrar.
+func isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		return strings.EqualFold(strings.TrimSpace(strings.Split(proto, ",")[0]), "https")
+	}
+	return false
 }
 
 func (s *Server) clearSession(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +86,7 @@ func (s *Server) clearSession(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: "", Path: "/", HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r), MaxAge: -1,
 	})
 }
 
@@ -215,7 +230,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "no se pudo crear el administrador")
 		return
 	}
-	if err := s.startSession(w, u); err != nil {
+	if err := s.startSession(w, r, u); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo iniciar la sesión")
 		return
 	}
@@ -237,7 +252,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "usuario o contraseña incorrectos")
 		return
 	}
-	if err := s.startSession(w, u); err != nil {
+	if err := s.startSession(w, r, u); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo iniciar la sesión")
 		return
 	}

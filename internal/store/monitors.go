@@ -45,11 +45,11 @@ type Monitor struct {
 	// alertas (los checks siguen corriendo y registrando historial).
 	// MaintWeekday sigue time.Weekday (0 = domingo). Horas en "HH:MM".
 	MaintEnabled bool
-	MaintWeekday  int
-	MaintStart    string
-	MaintEnd      string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	MaintWeekday int
+	MaintStart   string
+	MaintEnd     string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // MonitorWithOwner agrega el nombre del propietario para listados.

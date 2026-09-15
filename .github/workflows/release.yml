@@ -32,4 +32,5 @@ jobs:
           files: |
             dist/akena-watch-*
             dist/SHA256SUMS
+            scripts/install.sh
           generate_release_notes: true
