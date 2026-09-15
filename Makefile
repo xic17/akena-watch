@@ -12,7 +12,7 @@ TEST_DATA_DIR ?= ./.test-data
 # Configuración personal del desarrollador, si existe (ver Makefile.local.example).
 -include Makefile.local
 
-.PHONY: build build-linux-amd64 build-linux-arm64 run run-test test vet release docker clean
+.PHONY: build build-linux-amd64 build-linux-arm64 run run-test dev test vet release docker clean
 
 build:
 	@mkdir -p bin
@@ -42,14 +42,10 @@ release:
 run: build
 	./bin/akena-watch
 
-# reinicia el binario local con los datos de prueba (TEST_DATA_DIR).
-# útil durante el desarrollo: recompila, mata la instancia previa y arranca.
-run-test: build
-	@mkdir -p $(TEST_DATA_DIR)
-	@pkill -x akena-watch 2>/dev/null || true
-	@sleep 0.5
-	@echo "==> Akena Watch con datos de prueba en $(TEST_DATA_DIR)"
-	AKENA_DATA_DIR=$(TEST_DATA_DIR) ./bin/akena-watch
+# arranque de desarrollo con datos de prueba: recompila, reinicia y ejecuta
+# solo en loopback. El script lee TEST_DATA_DIR de Makefile.local (personal).
+run-test dev:
+	sh scripts/dev.sh
 
 test:
 	$(GO) test ./...

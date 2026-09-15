@@ -586,6 +586,18 @@ make vet     # go vet ./...
 sh scripts/smoke.sh   # prueba funcional completa contra un servidor real
 ```
 
+**Modo desarrollo con datos de prueba** (`make run-test` o `sh scripts/dev.sh`):
+recompila, reinicia la instancia anterior y arranca escuchando solo en
+`127.0.0.1`, con el directorio de datos de prueba (nunca los datos reales).
+El directorio se resuelve así: `AKENA_TEST_DATA_DIR` → `TEST_DATA_DIR` de
+`Makefile.local` (config personal, gitignoreada) → `./.test-data`.
+
+```sh
+make dev                          # atajo del script
+AKENA_TEST_DATA_DIR=/tmp/pruebas sh scripts/dev.sh   # otra carpeta de datos
+PORT=9000 sh scripts/dev.sh       # otro puerto
+```
+
 Estructura:
 
 ```text
@@ -604,6 +616,7 @@ akena-watch/
 │   ├── akena-watch.service     # systemd (Linux plano / CloudPanel 2)
 │   └── cloudflare/             # Worker + wrangler.jsonc (único código CF)
 ├── scripts/
+│   ├── dev.sh                  # arranque en modo desarrollo con datos de prueba
 │   ├── install.sh              # instalador desde GitHub Releases
 │   └── smoke.sh                # prueba funcional
 ├── .github/workflows/          # CI (validación) + Release (binarios)
