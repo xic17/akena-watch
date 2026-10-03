@@ -41,6 +41,13 @@ type Monitor struct {
 	// CertAlertDays: avisar una vez cuando el certificado TLS de un monitor
 	// HTTPS expire en menos de N días (0 = desactivado).
 	CertAlertDays int
+	// DomainAlertDays: avisar una vez cuando el dominio del monitor venza en
+	// menos de N días (0 = desactivado). DomainExpiresAt y DomainRegistrar
+	// guardan el resultado de la última consulta, para poder mostrarlo sin
+	// volver a preguntar al registro.
+	DomainAlertDays int
+	DomainExpiresAt time.Time
+	DomainRegistrar string
 	// Ventana de mantenimiento semanal: mientras está activa no se envían
 	// alertas (los checks siguen corriendo y registrando historial).
 	// MaintWeekday sigue time.Weekday (0 = domingo). Horas en "HH:MM".
@@ -72,12 +79,14 @@ func (s *Store) CreateMonitor(m Monitor) (Monitor, error) {
 	res, err := s.db.Exec(
 		`INSERT INTO monitors (owner_id, name, group_name, type, url, method, expected_status, keyword,
 		 body, invert_keyword, timeout_s, interval_s, active, public, notify, notify_owner, max_retries,
-		 latency_threshold_ms, slow_retries, cert_alert_days, maint_enabled, maint_weekday, maint_start, maint_end, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 latency_threshold_ms, slow_retries, cert_alert_days, domain_alert_days, domain_expires_at, domain_registrar,
+		 maint_enabled, maint_weekday, maint_start, maint_end, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.OwnerID, m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
 		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays,
+		m.DomainAlertDays, fechaOp(m.DomainExpiresAt), m.DomainRegistrar,
 		boolInt(m.MaintEnabled), m.MaintWeekday, m.MaintStart, m.MaintEnd, now, now)
 	if err != nil {
 		return Monitor{}, err
@@ -93,13 +102,23 @@ func (s *Store) UpdateMonitor(m Monitor) error {
 	_, err := s.db.Exec(
 		`UPDATE monitors SET name=?, group_name=?, type=?, url=?, method=?, expected_status=?, keyword=?,
 		 body=?, invert_keyword=?, timeout_s=?, interval_s=?, active=?, public=?, notify=?, notify_owner=?, max_retries=?,
-		 latency_threshold_ms=?, slow_retries=?, cert_alert_days=?, maint_enabled=?, maint_weekday=?, maint_start=?, maint_end=?, updated_at=?
+		 latency_threshold_ms=?, slow_retries=?, cert_alert_days=?, domain_alert_days=?, maint_enabled=?, maint_weekday=?, maint_start=?, maint_end=?, updated_at=?
 		 WHERE id=?`,
 		m.Name, m.Group, m.Type, m.URL, m.Method, m.ExpectedStatus, m.Keyword,
 		m.Body, boolInt(m.InvertKeyword), m.TimeoutS, m.IntervalS, boolInt(m.Active), boolInt(m.Public),
 		boolInt(m.Notify), boolInt(m.NotifyOwner), m.MaxRetries,
-		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays,
+		m.LatencyThresholdMS, m.SlowRetries, m.CertAlertDays, m.DomainAlertDays,
 		boolInt(m.MaintEnabled), m.MaintWeekday, m.MaintStart, m.MaintEnd, nowStr(), m.ID)
+	return err
+}
+
+// SetDomainExpiry guarda la última fecha de vencimiento conocida del dominio de
+// un monitor (la escribe el planificador tras cada consulta). No toca la
+// configuración del monitor.
+func (s *Store) SetDomainExpiry(id int64, vence time.Time, registrar string) error {
+	_, err := s.db.Exec(
+		"UPDATE monitors SET domain_expires_at = ?, domain_registrar = ? WHERE id = ?",
+		fechaOp(vence), registrar, id)
 	return err
 }
 
@@ -322,15 +341,17 @@ func (s *Store) ListMonitorViewerIDs(monitorID int64) ([]int64, error) {
 const monitorCols = `m.id, m.owner_id, m.name, m.group_name, m.type, m.url, m.method, m.expected_status,
 	m.keyword, m.body, m.invert_keyword, m.timeout_s, m.interval_s, m.active, m.public, m.notify,
 	m.notify_owner, m.max_retries, m.latency_threshold_ms, m.slow_retries, m.cert_alert_days,
+	m.domain_alert_days, m.domain_expires_at, m.domain_registrar,
 	m.maint_enabled, m.maint_weekday, m.maint_start, m.maint_end, m.created_at, m.updated_at`
 
 func scanMonitor(row scanner) (Monitor, error) {
 	var m Monitor
 	var inv, act, pub, not, notOwner, maint int
-	var createdAt, updatedAt string
+	var createdAt, updatedAt, domainExp string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays,
+		&m.DomainAlertDays, &domainExp, &m.DomainRegistrar,
 		&maint, &m.MaintWeekday, &m.MaintStart, &m.MaintEnd, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Monitor{}, ErrNotFound
@@ -346,6 +367,7 @@ func scanMonitor(row scanner) (Monitor, error) {
 	m.MaintEnabled = maint == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
+	m.DomainExpiresAt = parseTime(domainExp)
 	return m, nil
 }
 
@@ -357,11 +379,12 @@ type monitorRowScanner interface {
 func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	var m Monitor
 	var inv, act, pub, not, notOwner, maint int
-	var createdAt, updatedAt string
+	var createdAt, updatedAt, domainExp string
 	var owner string
 	err := row.Scan(&m.ID, &m.OwnerID, &m.Name, &m.Group, &m.Type, &m.URL, &m.Method, &m.ExpectedStatus,
 		&m.Keyword, &m.Body, &inv, &m.TimeoutS, &m.IntervalS, &act, &pub, &not, &notOwner, &m.MaxRetries,
 		&m.LatencyThresholdMS, &m.SlowRetries, &m.CertAlertDays,
+		&m.DomainAlertDays, &domainExp, &m.DomainRegistrar,
 		&maint, &m.MaintWeekday, &m.MaintStart, &m.MaintEnd, &createdAt, &updatedAt, &owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MonitorWithOwner{}, ErrNotFound
@@ -377,6 +400,7 @@ func scanMonitorWithOwner(row monitorRowScanner) (MonitorWithOwner, error) {
 	m.MaintEnabled = maint == 1
 	m.CreatedAt = parseTime(createdAt)
 	m.UpdatedAt = parseTime(updatedAt)
+	m.DomainExpiresAt = parseTime(domainExp)
 	return MonitorWithOwner{Monitor: m, OwnerName: owner}, nil
 }
 

@@ -11,6 +11,7 @@
   <button class="tab" role="tab" aria-selected="false" data-tab="http" type="button">Inspección HTTP</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="tls" type="button">Certificado TLS</button>
   <button class="tab" role="tab" aria-selected="false" data-tab="ports" type="button">Puertos</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="domain" type="button">Dominio</button>
 </div>
 
 <div class="tab-panel" id="tab-ping" role="tabpanel">
@@ -249,6 +250,34 @@
       <table class="events-table">
         <thead><tr><th>Puerto</th><th>Servicio</th><th>Latencia</th></tr></thead>
         <tbody id="ports-rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel hidden" id="tab-domain" role="tabpanel">
+  <div class="card tool-card" id="domain-tool">
+    <div class="tool-head">
+      <h2>Vencimiento del dominio</h2>
+      <p class="muted small">Averigua cuándo caduca el registro de un dominio y cuántos días quedan. Consulta primero RDAP y, si el registro no lo publica por ahí, WHOIS. Acepta un dominio o una URL.</p>
+    </div>
+    <form id="domain-form" class="tool-form tool-form-wide">
+      <div class="form-grid" style="grid-template-columns: 1fr">
+        <label>Dominio o URL
+          <input name="domain" required maxlength="512" placeholder="ejemplo.com o https://www.ejemplo.com/ruta" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <div class="tool-actions">
+        <button class="btn primary" type="submit" id="domain-btn">Consultar</button>
+      </div>
+    </form>
+    <div id="domain-error" class="error-box hidden"></div>
+    <div id="domain-result" class="hidden">
+      <p class="field-note" id="domain-summary"></p>
+      <div class="stat-grid" id="domain-stats"></div>
+      <p class="http-section">Registro</p>
+      <table class="events-table">
+        <tbody id="domain-rows"></tbody>
       </table>
     </div>
   </div>

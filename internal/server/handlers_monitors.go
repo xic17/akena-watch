@@ -38,6 +38,8 @@ type monitorInput struct {
 	SlowRetries        int `json:"slow_retries"`
 	// 0 = desactivado; avisa cuando el certificado TLS expire en ≤ N días.
 	CertAlertDays int `json:"cert_alert_days"`
+	// 0 = desactivado; avisa cuando el dominio del monitor venza en ≤ N días.
+	DomainAlertDays int `json:"domain_alert_days"`
 	// Ventana de mantenimiento semanal (sin alertas mientras está activa).
 	MaintEnabled *bool  `json:"maint_enabled"`
 	MaintWeekday int    `json:"maint_weekday"`
@@ -63,6 +65,7 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 		LatencyThresholdMS: in.LatencyThresholdMS,
 		SlowRetries:        in.SlowRetries,
 		CertAlertDays:      in.CertAlertDays,
+		DomainAlertDays:    in.DomainAlertDays,
 	}
 	if in.MaintEnabled != nil {
 		m.MaintEnabled = *in.MaintEnabled
@@ -143,6 +146,9 @@ func (in monitorInput) toMonitor() (store.Monitor, error) {
 	if m.CertAlertDays < 0 || m.CertAlertDays > 365 {
 		return m, errors.New("el aviso de certificado debe estar entre 0 y 365 días")
 	}
+	if m.DomainAlertDays < 0 || m.DomainAlertDays > 365 {
+		return m, errors.New("el aviso de vencimiento del dominio debe estar entre 0 y 365 días")
+	}
 	if m.MaintEnabled {
 		if m.MaintWeekday < 0 || m.MaintWeekday > 6 {
 			return m, errors.New("el día de mantenimiento debe estar entre 0 (domingo) y 6 (sábado)")
@@ -176,6 +182,7 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 		"latency_threshold_ms": m.LatencyThresholdMS,
 		"slow_retries":         m.SlowRetries,
 		"cert_alert_days":      m.CertAlertDays,
+		"domain_alert_days":    m.DomainAlertDays,
 		"maint_enabled":        m.MaintEnabled,
 		"maint_weekday":        m.MaintWeekday,
 		"maint_start":          m.MaintStart,
@@ -184,6 +191,13 @@ func (s *Server) monitorPayload(m store.MonitorWithOwner) (map[string]any, error
 	}
 
 	now := time.Now()
+	if !m.DomainExpiresAt.IsZero() {
+		p["domain_expires_at"] = m.DomainExpiresAt.Format(time.RFC3339)
+		p["domain_days_left"] = int(math.Ceil(time.Until(m.DomainExpiresAt).Hours() / 24))
+	}
+	if m.DomainRegistrar != "" {
+		p["domain_registrar"] = m.DomainRegistrar
+	}
 	if up, total, err := s.st.Uptime(m.ID, now.Add(-24*time.Hour)); err == nil && total > 0 {
 		p["uptime_24h"] = round2(float64(up) / float64(total) * 100)
 	}
@@ -384,6 +398,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	cur.LatencyThresholdMS = nm.LatencyThresholdMS
 	cur.SlowRetries = nm.SlowRetries
 	cur.CertAlertDays = nm.CertAlertDays
+	cur.DomainAlertDays = nm.DomainAlertDays
 	cur.MaintEnabled, cur.MaintWeekday = nm.MaintEnabled, nm.MaintWeekday
 	cur.MaintStart, cur.MaintEnd = nm.MaintStart, nm.MaintEnd
 

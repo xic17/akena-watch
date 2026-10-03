@@ -7,6 +7,61 @@ import (
 	"time"
 )
 
+func TestMonitorDomainExpiry(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "domain.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	u, err := s.CreateUser("akena", "hash", RoleAdmin, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := s.CreateMonitor(Monitor{
+		OwnerID: u.ID, Name: "Web", Type: TypeHTTP, URL: "https://ejemplo.com",
+		Method: "GET", ExpectedStatus: 200, TimeoutS: 5, IntervalS: 60,
+		Active: true, Notify: true, MaxRetries: 1, DomainAlertDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("CreateMonitor: %v", err)
+	}
+	if created.DomainAlertDays != 30 {
+		t.Fatalf("domain_alert_days = %d, esperado 30", created.DomainAlertDays)
+	}
+
+	// La última fecha conocida la escribe el planificador, no el formulario.
+	vence := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	if err := s.SetDomainExpiry(created.ID, vence, "Ejemplo Registrar"); err != nil {
+		t.Fatalf("SetDomainExpiry: %v", err)
+	}
+	got, err := s.GetMonitor(created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.DomainExpiresAt.Equal(vence) || got.DomainRegistrar != "Ejemplo Registrar" {
+		t.Fatalf("vencimiento = %v / %q, esperado %v / %q",
+			got.DomainExpiresAt, got.DomainRegistrar, vence, "Ejemplo Registrar")
+	}
+
+	// Editar el monitor no puede perder el dato ya consultado.
+	got.Name = "Web 2"
+	got.DomainAlertDays = 15
+	if err := s.UpdateMonitor(got); err != nil {
+		t.Fatalf("UpdateMonitor: %v", err)
+	}
+	got2, err := s.GetMonitor(created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got2.DomainExpiresAt.Equal(vence) || got2.DomainRegistrar != "Ejemplo Registrar" {
+		t.Fatalf("editar perdió el vencimiento: %v / %q", got2.DomainExpiresAt, got2.DomainRegistrar)
+	}
+	if got2.DomainAlertDays != 15 || got2.Name != "Web 2" {
+		t.Fatalf("la edición no se guardó: %+v", got2)
+	}
+}
+
 func TestMonitorCRUD(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

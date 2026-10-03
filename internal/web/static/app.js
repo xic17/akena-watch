@@ -331,6 +331,7 @@ if (document.getElementById("monitor-list")) {
             ${!m.active ? '<span class="badge paused">pausado</span>' : ""}
             ${slow ? '<span class="badge slow">lento</span>' : ""}
             ${m.maint ? '<span class="badge maint">mantenimiento</span>' : ""}
+            ${m.domain_alert_days > 0 && typeof m.domain_days_left === "number" && m.domain_days_left <= m.domain_alert_days ? `<span class="badge amber" title="El dominio vence en ${m.domain_days_left} días">dominio</span>` : ""}
             ${m.owner !== undefined && m.owner_id !== ME_ID ? '<span class="badge">de ' + esc(m.owner) + "</span>" : ""}
           </div>
           <div class="monitor-url muted small">${esc(m.url)}</div>
@@ -420,6 +421,11 @@ if (document.getElementById("monitor-list")) {
       .map((nid) => (NOTIFS.find((n) => n.id === nid) || {}).name)
       .filter(Boolean);
     const shareNames = (m.shares || []).map((s) => s.username);
+    const domainInfo = m.domain_expires_at
+      ? "Dominio: vence el " + esc(m.domain_expires_at.slice(0, 10)) +
+        (m.domain_registrar ? " (" + esc(m.domain_registrar) + ")" : "") +
+        (typeof m.domain_days_left === "number" ? (m.domain_days_left < 0 ? " · ya vencido" : " · faltan " + m.domain_days_left + " días") : "")
+      : "";
 
     openModal(`
       <h2>${esc(m.name)} <span class="badge">${TYPE_LABEL[m.type] || m.type}</span></h2>
@@ -432,6 +438,7 @@ if (document.getElementById("monitor-list")) {
       </div>
       <p class="field-note">${m.group ? "Grupo " + esc(m.group) + " · " : ""}Intervalo ${m.interval_s} s · Timeout ${m.timeout_s} s · Reintentos ${m.max_retries}${notifNames.length ? " · Canales: " + esc(notifNames.join(", ")) : ""}${shareNames.length ? " · Compartido con: " + esc(shareNames.join(", ")) : ""}</p>
       <div id="md-events"><p class="muted small">Cargando eventos…</p></div>
+      ${domainInfo ? `<p class="field-note">${domainInfo}</p>` : ""}
       <div class="modal-actions">
         <button class="btn ghost" type="button" onclick="closeModal()">Cerrar</button>
       </div>`, true);
@@ -700,6 +707,14 @@ if (document.getElementById("monitor-list")) {
           <div class="full">
             <p class="field-note">Si la latencia supera el umbral durante N checks seguidos (con estado "arriba"), se alerta como lento. 0 desactiva la función.</p>
           </div>
+          <div>
+            <label>Avisar si el dominio vence en ≤ (días)
+              <input name="domain_alert_days" type="number" min="0" max="365" value="${f.domain_alert_days || 0}" title="0 = desactivado">
+            </label>
+          </div>
+          <div class="full">
+            <p class="field-note">El vencimiento del dominio se deduce del destino (URL o host) y se consulta una vez al día: avisa cuando queden menos días que el umbral. 0 desactiva la función.</p>
+          </div>
         </div>
 
         <label class="check-row"><input type="checkbox" name="active" ${f.active ? "checked" : ""}> Monitor activo</label>
@@ -789,6 +804,7 @@ if (document.getElementById("monitor-list")) {
         latency_threshold_ms: parseInt(fd.get("latency_threshold_ms") || "0", 10),
         slow_retries: parseInt(fd.get("slow_retries") || "3", 10),
         cert_alert_days: parseInt(fd.get("cert_alert_days") || "0", 10),
+        domain_alert_days: parseInt(fd.get("domain_alert_days") || "0", 10),
         maint_enabled: fd.get("maint_enabled") === "on",
         maint_weekday: parseInt(fd.get("maint_weekday") || "0", 10),
         maint_start: fd.get("maint_start") || "",
@@ -1229,7 +1245,7 @@ if (document.getElementById("user-list")) {
 // --- herramientas: pestañas ---
 const toolsTabs = document.getElementById("tools-tabs");
 if (toolsTabs) {
-  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http", tls: "tab-tls", ports: "tab-ports" };
+  const panels = { ping: "tab-ping", whois: "tab-whois", dns: "tab-dns", http: "tab-http", tls: "tab-tls", ports: "tab-ports", domain: "tab-domain" };
   const saved = localStorage.getItem("akena_tool_tab");
   const switchTab = (name) => {
     $$(".tab", toolsTabs).forEach((b) => {
@@ -1672,5 +1688,59 @@ if (portsTool) {
           `<tr><td><span class="badge">${p.port}</span></td><td>${esc(p.service || "—")}</td><td>${p.latency_ms} ms</td></tr>`).join("")
       : '<tr><td colspan="3" class="muted">Ninguno abierto (el host puede filtrar puertos o estar caído)</td></tr>';
     $pf("ports-result").classList.remove("hidden");
+  }
+}
+
+// --- herramientas: vencimiento del dominio ---
+const domainTool = document.getElementById("domain-tool");
+if (domainTool) {
+  const $om = (id) => document.getElementById(id);
+
+  $om("domain-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = $om("domain-btn");
+    btn.disabled = true;
+    btn.textContent = "Consultando…";
+    $om("domain-error").classList.add("hidden");
+    $om("domain-result").classList.add("hidden");
+    try {
+      const res = await api("/api/domain?domain=" + encodeURIComponent(fd.get("domain").trim()));
+      renderDomainResult(res);
+    } catch (err) {
+      const box = $om("domain-error");
+      box.textContent = "⚠️ " + err.message;
+      box.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Consultar";
+    }
+  });
+
+  function renderDomainResult(res) {
+    const d = res.days_left;
+    const cls = d < 0 ? "down" : d <= 30 ? "amber" : "up";
+    const texto = cls === "down" ? "vencido hace " + (-d) + " días" : d === 0 ? "vence hoy" : "faltan " + d + " días";
+    const tono = cls === "down" ? "error-text" : cls === "amber" ? "slow-text" : "up-text";
+    const fuente = (res.source || "").toUpperCase();
+    $om("domain-summary").innerHTML =
+      `${esc(res.domain)} — <span class="${tono}">${esc(texto)}</span> · vence el ${esc(res.expires_at)} · fuente ${esc(fuente)}`;
+
+    const tile = (label, value, c = "") =>
+      `<div class="stat-card"><span class="stat-value ${c}">${value}</span><span class="stat-label">${label}</span></div>`;
+    $om("domain-stats").innerHTML =
+      tile("Días restantes", d, cls) +
+      tile("Vence", esc(res.expires_at), "");
+
+    const row = (k, v) => `<tr><td style="width:30%;opacity:.8">${k}</td><td>${v}</td></tr>`;
+    $om("domain-rows").innerHTML = [
+      row("Dominio registrable", esc(res.domain)),
+      row("Consultado", esc(res.host)),
+      row("Registrador", esc(res.registrar || "—")),
+      row("Vencimiento", esc(res.expires_at)),
+      row("Días restantes", d),
+      row("Fuente", esc(fuente)),
+    ].join("");
+    $om("domain-result").classList.remove("hidden");
   }
 }

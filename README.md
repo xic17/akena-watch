@@ -35,6 +35,7 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
     - [Ping en tiempo real](#ping-en-tiempo-real)
     - [Inspección HTTP](#inspección-http)
     - [Certificado TLS](#certificado-tls)
+    - [Vencimiento del dominio](#vencimiento-del-dominio)
     - [Escaneo de puertos](#escaneo-de-puertos)
     - [Whois](#whois)
     - [DNS Lookup](#dns-lookup)
@@ -77,6 +78,9 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
   alerta única tras N checks consecutivos por encima del umbral.
 - **Aviso de expiración de certificado**: en monitores HTTP(S), alerta cuando al
   certificado le quedan menos días que el umbral configurado (comprobación diaria).
+- **Aviso de vencimiento de dominio**: alerta cuando al registro del dominio del
+  monitor le quedan menos días que el umbral configurado (consulta diaria por RDAP
+  y WHOIS).
 - **Ventana de mantenimiento semanal**: franjas sin alertas (con soporte de cruce
   de medianoche) en las que los checks y el historial se conservan.
 - **Pausar, reanudar y duplicar** monitores desde el listado.
@@ -85,6 +89,8 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
   - **Inspección HTTP**: tiempos desglosados (DNS, conexión, TLS, TTFB), cadena de
     redirecciones, cabeceras, certificado y vista previa del cuerpo.
   - **Certificado TLS**: validez, emisor, SANs, serie, algoritmos y días restantes.
+  - **Vencimiento del dominio**: cuándo caduca el registro y cuántos días quedan
+    (RDAP y WHOIS).
   - **Escaneo de puertos** TCP con perfiles o rango personalizado, servicio y latencia.
   - **Whois** y **DNS Lookup** (A, AAAA, CNAME, MX, NS, TXT, PTR).
 - **Página de estado pública** por usuario, sin autenticación, con **historial
@@ -278,6 +284,28 @@ En monitores **HTTP(S)** se puede vigilar la caducidad del certificado TLS:
 - Si el host está caído no se puede comprobar el certificado, por lo que no se
   generan falsas alertas.
 
+### Aviso de vencimiento de dominio
+
+Además del certificado, se puede vigilar la **caducidad del registro del
+dominio** del monitor: un olvido en la renovación deja el sitio inaccesible
+mucho más tiempo que un certificado caducado.
+
+- **Avisar si el dominio vence en ≤ (días)**: umbral en días. `0` lo desactiva.
+- El dominio se deduce del destino del monitor (`https://panel.ejemplo.com/x` →
+  `ejemplo.com`), así que vale para monitores HTTP, TCP y DNS.
+- Se consulta **una vez al día** y se guarda la última fecha conocida, de forma
+  que la ficha del monitor la muestra sin repetir la consulta (que puede tardar
+  varios segundos).
+- Cuando quedan menos días que el umbral, se envía una **alerta única** 🗓️
+  indicando la fecha y si vence hoy, en N días o si ya ha vencido.
+- Si el dominio se renueva (o vuelve a estar lejos del umbral), el aviso se
+  rearma para el siguiente ciclo.
+- La consulta se hace por **RDAP** (estructurado) y, si el registro no lo publica
+  por esa vía, por **WHOIS**. Hay registros que sencillamente no publican la
+  fecha —`.de`, por ejemplo—: en ese caso no se inventa nada y no se alerta.
+- Mientras el monitor esté en su **ventana de mantenimiento**, la alerta no se
+  envía.
+
 ### Ventana de mantenimiento
 
 Permite silenciar las alertas de un monitor durante una franja recurrente, sin
@@ -420,6 +448,21 @@ puerto configurable (por defecto 443):
 - Se conecta sin validar el certificado a propósito: permite ver certificados
   caducados, autofirmados o que no coinciden con el host.
 - Si se consulta una IP, no se envía SNI (igual que un cliente real).
+
+### Vencimiento del dominio
+
+Averigua cuándo caduca el registro de un dominio (`GET /api/domain?domain=...`),
+aceptando un dominio o una URL:
+
+- **Fuente**: primero **RDAP** (JSON estructurado del registro) y, si el registro
+  no publica la fecha por esa vía, **WHOIS** (puerto 43), reconociendo los
+  formatos habituales de gTLD, `.uk`, `.mx`, `.cl`, `.br`, `.es`…
+- **Resultado**: dominio registrable, registrador, fecha de vencimiento, días
+  restantes y la fuente usada.
+- Si el registro no publica la fecha (`.de`, por ejemplo) o el dominio no existe,
+  se avisa con un mensaje claro en vez de inventar una fecha.
+- Es la misma consulta que hace el **aviso de vencimiento** de los monitores, así
+  que sirve para comprobarlo a mano antes de configurar el umbral.
 
 ### Escaneo de puertos
 
@@ -672,6 +715,7 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 | `POST` | `/api/httpcheck` | sesión | Inspección HTTP (tiempos, redirecciones, cabeceras, cuerpo) |
 | `POST` | `/api/tlscheck` | sesión | Certificado TLS de un host:puerto |
 | `POST` | `/api/portscan` | sesión | Escaneo de puertos TCP |
+| `GET` | `/api/domain?domain=...` | sesión | Vencimiento del registro de un dominio (RDAP y WHOIS) |
 
 ## Seguridad
 

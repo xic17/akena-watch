@@ -183,6 +183,50 @@ func (m *Manager) NotifyOwnerCert(mon store.Monitor, detail string, at time.Time
 	m.notifyOwnerText(mon, formatCertMessage(mon, detail, at), at)
 }
 
+// SendDomain notifica que el dominio del monitor está a punto de vencer (o ya
+// venció). {{status}} = "domain" en las plantillas.
+func (m *Manager) SendDomain(mon store.Monitor, detail string, at time.Time) {
+	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
+	if err != nil || len(channels) == 0 {
+		return
+	}
+	text := formatDomainMessage(mon, detail, at)
+	v := vars{
+		MonitorName: mon.Name,
+		MonitorURL:  mon.URL,
+		MonitorType: mon.Type,
+		Status:      "domain",
+		Msg:         detail,
+		Time:        at.Format(time.RFC3339),
+		Localtime:   at.Local().Format("02/01/2006 15:04:05"),
+	}
+	for _, ch := range channels {
+		go func(ch store.Notification) {
+			if err := sendChannel(ch, text, v); err != nil {
+				log.Printf("alerta de dominio %q (canal %s): %v", ch.Name, ch.Type, err)
+			}
+		}(ch)
+	}
+}
+
+func formatDomainMessage(mon store.Monitor, detail string, at time.Time) string {
+	if detail == "" {
+		detail = "el dominio está a punto de vencer"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "🗓️ *Akena Watch — Dominio por vencer*\n")
+	fmt.Fprintf(&b, "Monitor: *%s* (%s)\n", mon.Name, mon.Type)
+	fmt.Fprintf(&b, "Destino: %s\n", mon.URL)
+	fmt.Fprintf(&b, "Detalle: %s\n", detail)
+	fmt.Fprintf(&b, "Hora: %s", at.Local().Format("02/01/2006 15:04:05"))
+	return b.String()
+}
+
+// NotifyOwnerDomain envía el aviso de vencimiento al Telegram del propietario.
+func (m *Manager) NotifyOwnerDomain(mon store.Monitor, detail string, at time.Time) {
+	m.notifyOwnerText(mon, formatDomainMessage(mon, detail, at), at)
+}
+
 // Test envía un mensaje de prueba por el canal indicado, sin tocar
 // ningún monitor. Se usa desde el botón "Probar" de la interfaz.
 // Las variables de la plantilla se rellenan con valores de ejemplo

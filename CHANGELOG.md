@@ -9,6 +9,19 @@ proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
 ### Añadido
 
+- **Aviso de vencimiento de dominio**: los monitores pueden vigilar cuándo caduca
+  el registro de su dominio y avisar cuando queden menos días que el umbral
+  configurado. El dominio se deduce del destino del monitor, así que vale para
+  HTTP, TCP y DNS. Se consulta una vez al día por **RDAP** (estructurado) y, si el
+  registro no publica la fecha por esa vía, por **WHOIS**; la última fecha
+  conocida se guarda con el monitor para verla en su ficha sin repetir la
+  consulta. La alerta 🗓️ es única y se rearma si el dominio se renueva, y no se
+  envía durante la ventana de mantenimiento. Si el registro no publica la fecha
+  (`.de`, por ejemplo) no se inventa nada y no se alerta.
+- **Herramienta «Dominio»** en la sesión de Herramientas: la misma consulta a
+  demanda, sobre un dominio o una URL (`GET /api/domain?domain=...`), mostrando
+  dominio registrable, registrador, fecha de vencimiento, días restantes y la
+  fuente usada (RDAP o WHOIS).
 - **Protección contra fuerza bruta en el acceso**: tras `AKENA_LOGIN_INTENTOS`
   fallos (5 por defecto) el acceso se bloquea para esa cuenta y esa IP, con
   espera que se dobla en cada fallo adicional hasta un tope de 10 minutos. Un

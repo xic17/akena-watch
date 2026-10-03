@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"akena-watch/internal/domain"
 	"akena-watch/internal/notifier"
 	"akena-watch/internal/store"
 )
@@ -43,6 +44,8 @@ type monState struct {
 	slowAlerted         bool
 	lastCertCheck       time.Time // último sondeo del certificado TLS
 	certAlerted         bool
+	lastDomainCheck     time.Time // última consulta de vencimiento del dominio
+	domainAlerted       bool
 }
 
 // NewScheduler crea un scheduler. Hub puede ser nil (sin tiempo real).
@@ -221,6 +224,38 @@ func (s *Scheduler) run(m store.Monitor, now time.Time) {
 			}
 		} else if days > m.CertAlertDays {
 			st.certAlerted = false // renovado o aún lejos: se rearma el aviso
+		}
+	}
+
+	// vencimiento del dominio: también es una señal que cambia como mucho una
+	// vez al año, así que se consulta a lo sumo una vez al día. El resultado se
+	// guarda en el monitor para poder mostrarlo sin repetir la consulta (una
+	// consulta WHOIS puede tardar varios segundos).
+	if m.DomainAlertDays > 0 && time.Since(st.lastDomainCheck) >= 24*time.Hour {
+		st.lastDomainCheck = now
+		if info, err := domain.Lookup(ctx, m.URL); err == nil {
+			if err := s.st.SetDomainExpiry(m.ID, info.ExpiresAt, info.Registrar); err != nil {
+				log.Printf("guardando vencimiento del dominio (monitor %d): %v", m.ID, err)
+			}
+			fecha := info.ExpiresAt.Format("2006-01-02")
+			switch {
+			case info.DaysLeft <= m.DomainAlertDays && !inMaint && !st.domainAlerted && s.notify != nil:
+				st.domainAlerted = true
+				detail := fmt.Sprintf("el dominio vence en %d días (%s)", info.DaysLeft, fecha)
+				if info.DaysLeft < 0 {
+					detail = fmt.Sprintf("el dominio venció hace %d días (%s)", -info.DaysLeft, fecha)
+				} else if info.DaysLeft == 0 {
+					detail = "el dominio vence HOY (" + fecha + ")"
+				}
+				if m.Notify {
+					go s.notify.SendDomain(m, detail, hb.CheckedAt)
+				}
+				if m.NotifyOwner {
+					s.notify.NotifyOwnerDomain(m, detail, hb.CheckedAt)
+				}
+			case info.DaysLeft > m.DomainAlertDays:
+				st.domainAlerted = false // renovado o aún lejos: se rearma el aviso
+			}
 		}
 	}
 

@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS monitors (
 	latency_threshold_ms INTEGER NOT NULL DEFAULT 0,
 	slow_retries     INTEGER NOT NULL DEFAULT 0,
 	cert_alert_days  INTEGER NOT NULL DEFAULT 0,
+	domain_alert_days INTEGER NOT NULL DEFAULT 0,
+	domain_expires_at TEXT NOT NULL DEFAULT '',
+	domain_registrar TEXT NOT NULL DEFAULT '',
 	maint_enabled    INTEGER NOT NULL DEFAULT 0,
 	maint_weekday    INTEGER NOT NULL DEFAULT 0,
 	maint_start      TEXT NOT NULL DEFAULT '',
@@ -157,7 +160,51 @@ func (s *Store) migrate() error {
 	if err := s.migrateMonitorsMaint(); err != nil {
 		return err
 	}
+	if err := s.migrateMonitorsDomain(); err != nil {
+		return err
+	}
 	return s.migrateMonitorsGroup()
+}
+
+// migrateMonitorsDomain añade el aviso de vencimiento de dominio y la última
+// fecha conocida (domain_alert_days, domain_expires_at, domain_registrar).
+func (s *Store) migrateMonitorsDomain() error {
+	cols := []struct {
+		name, kind, def string
+	}{
+		{"domain_alert_days", "INTEGER", "0"},
+		{"domain_expires_at", "TEXT", "''"},
+		{"domain_registrar", "TEXT", "''"},
+	}
+	for _, col := range cols {
+		rows, err := s.db.Query("PRAGMA table_info(monitors)")
+		if err != nil {
+			return err
+		}
+		found := false
+		for rows.Next() {
+			var cid, notnull, pk int
+			var name, ctype string
+			var dflt any
+			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+				rows.Close()
+				return err
+			}
+			if name == col.name {
+				found = true
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if !found {
+			if _, err := s.db.Exec("ALTER TABLE monitors ADD COLUMN " + col.name + " " + col.kind + " NOT NULL DEFAULT " + col.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // migrateMonitorsGroup añade la columna group_name (categoría) a los
@@ -381,6 +428,14 @@ func (s *Store) migrateMonitorsMaint() error {
 }
 
 func nowStr() string { return time.Now().UTC().Format(timeFmt) }
+
+// fechaOp formatea una fecha opcional: cadena vacía cuando no hay dato.
+func fechaOp(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(timeFmt)
+}
 
 func parseTime(s string) time.Time {
 	t, err := time.Parse(timeFmt, s)
