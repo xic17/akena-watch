@@ -127,6 +127,9 @@ chmod +x akena-watch
             <tr><td><code>AKENA_BIND</code></td><td><code>0.0.0.0</code></td><td>Interfaz de escucha (<code>127.0.0.1</code> detrás de un proxy)</td></tr>
             <tr><td><code>AKENA_PORT</code></td><td><code>PORT</code> o <code>8080</code></td><td>Puerto HTTP</td></tr>
             <tr><td><code>PORT</code></td><td>—</td><td>Convención PaaS, usado si <code>AKENA_PORT</code> no está definido</td></tr>
+            <tr><td><code>AKENA_LOGIN_INTENTOS</code></td><td><code>5</code></td><td>Fallos de acceso permitidos antes de bloquear</td></tr>
+            <tr><td><code>AKENA_LOGIN_BLOQUEO_SEG</code></td><td><code>30</code></td><td>Segundos de bloqueo inicial (se dobla con cada fallo extra, tope 10 min)</td></tr>
+            <tr><td><code>AKENA_LOGIN_MEMORIA_MIN</code></td><td><code>15</code></td><td>Minutos que se recuerda un fallo sin más actividad</td></tr>
           </tbody>
         </table>
         <pre><code><span class="cmt"># ejemplos</span>
@@ -232,6 +235,7 @@ docker run -d --name akena-watch -p 8080:8080 -v akena-data:/data akena-watch</c
         <h2>Seguridad</h2>
         <ul>
           <li>Contraseñas hasheadas con bcrypt; sesiones con token aleatorio en cookie HttpOnly.</li>
+          <li>Protección contra fuerza bruta: tras 5 fallos el acceso se bloquea para esa cuenta y esa IP, con espera creciente (tope 10 minutos). Un acierto borra el historial.</li>
           <li>Protección CSRF: las peticiones de estado con <code>Origin</code> de otro host se rechazan.</li>
           <li>La base de datos vive en el directorio que tú protejas (<code>AKENA_DATA_DIR</code>).</li>
         </ul>

@@ -14,9 +14,10 @@ const (
 )
 
 var (
-	ErrNotFound      = errors.New("no encontrado")
-	ErrUsernameTaken = errors.New("el nombre de usuario ya existe")
-	ErrEmailTaken    = errors.New("ese correo ya está registrado")
+	ErrNotFound         = errors.New("no encontrado")
+	ErrUsernameTaken    = errors.New("el nombre de usuario ya existe")
+	ErrEmailTaken       = errors.New("ese correo ya está registrado")
+	ErrAlreadyInstalled = errors.New("la instalación ya fue completada")
 )
 
 // User es un usuario de la aplicación. Cada usuario posee sus propios
@@ -57,6 +58,39 @@ func (s *Store) CreateUser(username, passwordHash, role, email, telegramID strin
 			return User{}, ErrEmailTaken
 		}
 		return User{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return User{}, err
+	}
+	return s.GetUserByID(id)
+}
+
+// CreateFirstUser crea el primer usuario y solo funciona si la tabla está
+// vacía: la comprobación y la inserción son una sola sentencia SQL, de modo
+// que dos instalaciones simultáneas no pueden crear dos administradores (una
+// gana y la otra recibe ErrAlreadyInstalled).
+func (s *Store) CreateFirstUser(username, passwordHash, role, email, telegramID string) (User, error) {
+	res, err := s.db.Exec(
+		`INSERT INTO users (username, email, telegram_id, password_hash, role, status_title, status_desc, created_at)
+		 SELECT ?, ?, ?, ?, ?, 'Estado de los servicios', '', ?
+		 WHERE NOT EXISTS (SELECT 1 FROM users)`,
+		username, email, telegramID, passwordHash, role, nowStr())
+	if err != nil {
+		if isUniqueErr(err) {
+			if strings.Contains(err.Error(), "users.username") {
+				return User{}, ErrUsernameTaken
+			}
+			return User{}, ErrEmailTaken
+		}
+		return User{}, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return User{}, err
+	}
+	if n == 0 {
+		return User{}, ErrAlreadyInstalled
 	}
 	id, err := res.LastInsertId()
 	if err != nil {

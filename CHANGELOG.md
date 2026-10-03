@@ -5,6 +5,30 @@ Todos los cambios notables de **Akena Watch — Siempre en Guardia**.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el
 proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Añadido
+
+- **Protección contra fuerza bruta en el acceso**: tras `AKENA_LOGIN_INTENTOS`
+  fallos (5 por defecto) el acceso se bloquea para esa cuenta y esa IP, con
+  espera que se dobla en cada fallo adicional hasta un tope de 10 minutos. Un
+  acceso correcto borra el historial, y reiniciar Akena Watch perdona los
+  bloqueos (algo que quien ataca no puede provocar desde fuera). La respuesta
+  bloqueada es `429` con `Retry-After` y un mensaje claro, y no llega a comprobar
+  la contraseña, así que tampoco gasta bcrypt. El contador por usuario no se
+  puede esquivar falsificando cabeceras; detrás de un proxy en la misma máquina
+  (el nginx de CloudPanel) se usa la IP real que este informa en `X-Real-IP` o
+  `X-Forwarded-For`, y solo desde loopback. Los fallos se registran en el log con
+  usuario e IP, nunca con la contraseña probada. Se ajusta con
+  `AKENA_LOGIN_INTENTOS`, `AKENA_LOGIN_BLOQUEO_SEG` y `AKENA_LOGIN_MEMORIA_MIN`.
+
+### Corregido
+
+- **La instalación inicial es atómica**: completar el asistente dos veces a la
+  vez ya no puede crear dos administradores. La comprobación y la inserción son
+  una sola sentencia SQL, así que solo una petición gana y la otra recibe «la
+  instalación ya fue completada».
+
 ## [1.1.1] — 2026-09-15
 
 ### Seguridad
@@ -220,6 +244,7 @@ se conservan.
 - Despliegue documentado en Linux (systemd), **CloudPanel 2** (reverse proxy),
   **Cloudflare Containers** y Docker.
 
+[Sin publicar]: https://github.com/xic17/akena-watch/compare/v1.1.1...HEAD
 [1.1.1]: https://github.com/xic17/akena-watch/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/xic17/akena-watch/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/xic17/akena-watch/compare/v1.0.6...v1.0.7

@@ -467,6 +467,9 @@ Todo se configura con variables de entorno — el binario es agnóstico de plata
 | `AKENA_BIND` | `0.0.0.0` | Interfaz de escucha (`127.0.0.1` detrás de un proxy) |
 | `AKENA_PORT` | `PORT` o `8080` | Puerto HTTP |
 | `PORT` | — | Convención PaaS, usado si `AKENA_PORT` no está definido |
+| `AKENA_LOGIN_INTENTOS` | `5` | Fallos de acceso permitidos antes de bloquear |
+| `AKENA_LOGIN_BLOQUEO_SEG` | `30` | Segundos de bloqueo inicial (se dobla con cada fallo extra, tope 10 min) |
+| `AKENA_LOGIN_MEMORIA_MIN` | `15` | Minutos que se recuerda un fallo sin más actividad |
 
 Las credenciales de canales de alerta (tokens, contraseñas SMTP) se guardan en la
 base de datos, que a su vez vive en el directorio que tú protejas.
@@ -674,6 +677,14 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
 
 - Contraseñas con **bcrypt**; sesiones con token aleatorio (32 bytes) en cookie
   `HttpOnly` + `SameSite=Lax`, expiración de 30 días.
+- **Protección contra fuerza bruta**: tras `AKENA_LOGIN_INTENTOS` fallos (5 por
+  defecto) el acceso queda bloqueado para esa cuenta y esa IP; cada fallo
+  adicional dobla la espera hasta un tope de 10 minutos y un acierto borra el
+  historial (reiniciar el proceso también perdona los bloqueos). El contador por
+  usuario no se puede esquivar con cabeceras falsas; detrás de un proxy en la
+  misma máquina (el nginx de CloudPanel) se tiene en cuenta la IP real que este
+  informa en `X-Real-IP` o `X-Forwarded-For`, y solo desde loopback. Los intentos
+  fallidos quedan en el log con usuario e IP, nunca con la contraseña probada.
 - **CSRF**: las peticiones de estado con `Origin` de otro host se rechazan.
 - Validación estricta de entradas en el servidor (longitudes, tipos, rangos).
 - No se puede eliminar ni degradar al **último administrador**.

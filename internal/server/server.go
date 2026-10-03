@@ -21,6 +21,7 @@ type Server struct {
 	notify  *notifier.Manager
 	version string
 	pages   map[string]*template.Template
+	limite  *loginLimiter
 }
 
 // New construye el servidor. Cada página vive en un clon del template
@@ -35,7 +36,10 @@ func New(st *store.Store, hub *Hub, notify *notifier.Manager, version string) *S
 		pages[name] = template.Must(base.Clone())
 		template.Must(pages[name].ParseFS(web.FS, "templates/"+name))
 	}
-	return &Server{st: st, hub: hub, notify: notify, version: version, pages: pages}
+	return &Server{
+		st: st, hub: hub, notify: notify, version: version, pages: pages,
+		limite: newLoginLimiter(loginLimitFromEnv()),
+	}
 }
 
 // Handler construye el mux con todas las rutas y la cadena de middlewares.

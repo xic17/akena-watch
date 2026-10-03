@@ -9,6 +9,9 @@
 //	AKENA_DATA_DIR  directorio donde vive akena.db (default: ./data)
 //	AKENA_BIND      interfaz de escucha (default: 0.0.0.0)
 //	AKENA_PORT      puerto HTTP (default: $PORT o 8080)
+//	AKENA_LOGIN_INTENTOS     fallos de acceso antes de bloquear (default: 5)
+//	AKENA_LOGIN_BLOQUEO_SEG  segundos de bloqueo inicial (default: 30)
+//	AKENA_LOGIN_MEMORIA_MIN  minutos que se recuerda un fallo (default: 15)
 package main
 
 import (

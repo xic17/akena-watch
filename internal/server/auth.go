@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -180,6 +183,9 @@ func validateTelegramID(id string) error {
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	// Comprobación adelantada: si ya hay usuarios no tiene sentido gastar
+	// bcrypt. La garantía real frente a dos instalaciones a la vez la da
+	// CreateFirstUser, que inserta de forma atómica.
 	n, err := s.st.CountUsers()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "error interno")
@@ -221,12 +227,18 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "error interno")
 		return
 	}
-	u, err := s.st.CreateUser(in.Username, string(hash), store.RoleAdmin, in.Email, in.TelegramID)
-	if err == store.ErrEmailTaken {
+	u, err := s.st.CreateFirstUser(in.Username, string(hash), store.RoleAdmin, in.Email, in.TelegramID)
+	switch {
+	case errors.Is(err, store.ErrAlreadyInstalled):
+		writeErr(w, http.StatusBadRequest, "la instalación ya fue completada")
+		return
+	case errors.Is(err, store.ErrEmailTaken):
 		writeErr(w, http.StatusBadRequest, "ese correo ya está registrado")
 		return
-	}
-	if err != nil {
+	case errors.Is(err, store.ErrUsernameTaken):
+		writeErr(w, http.StatusBadRequest, "ese nombre de usuario ya existe")
+		return
+	case err != nil:
 		writeErr(w, http.StatusInternalServerError, "no se pudo crear el administrador")
 		return
 	}
@@ -246,12 +258,34 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "solicitud inválida")
 		return
 	}
+	usuario := strings.TrimSpace(in.Username)
+	ip := clientIP(r)
 
-	u, err := s.st.GetUserByUsername(strings.TrimSpace(in.Username))
+	// Anti fuerza bruta: agotados los intentos no se comprueba siquiera la
+	// contraseña (ahorra el coste de bcrypt) y se responde 429 con Retry-After.
+	if d := s.limite.espera(usuario, ip); d > 0 {
+		seg := int((d + time.Second - 1) / time.Second)
+		if seg < 1 {
+			seg = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(seg))
+		writeErr(w, http.StatusTooManyRequests,
+			fmt.Sprintf("demasiados intentos fallidos; vuelve a probar en %d s", seg))
+		return
+	}
+
+	u, err := s.st.GetUserByUsername(usuario)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)) != nil {
+		bloqueo := s.limite.fallo(usuario, ip)
+		if bloqueo > 0 {
+			log.Printf("acceso fallido desde %s: usuario %q (bloqueado %s)", ip, usuario, bloqueo)
+		} else {
+			log.Printf("acceso fallido desde %s: usuario %q", ip, usuario)
+		}
 		writeErr(w, http.StatusUnauthorized, "usuario o contraseña incorrectos")
 		return
 	}
+	s.limite.exito(usuario, ip)
 	if err := s.startSession(w, r, u); err != nil {
 		writeErr(w, http.StatusInternalServerError, "no se pudo iniciar la sesión")
 		return
