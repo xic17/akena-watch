@@ -1,0 +1,36 @@
+# Akena Watch
+
+> Akena Watch (Siempre en Guardia) es un monitor de disponibilidad (uptime) portable: un único binario estático escrito en Go, con SQLite embebida y cero dependencias de runtime. Vigila servicios HTTP, TCP y DNS, guarda el historial de latencia y caídas, y avisa por Telegram, webhook o correo (SMTP).
+
+Se despliega copiando un solo ejecutable: sin Docker obligatorio y sin Node ni otros runtimes. Incluye multi-usuario (administradores y colaboradores con permisos por grupos o asignación manual), página de estado pública en tiempo real por WebSocket, y herramientas de red (ping TCP/ICMP, inspección HTTP, verificación de certificados TLS, aviso de vencimiento de dominio por RDAP/WHOIS, escaneo de puertos, whois y DNS lookup).
+
+- Licencia: MIT
+- Lenguaje: Go (binario estático, CGO deshabilitado)
+- Plataformas: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64
+- Sitio web: https://akenawatch.com/
+- Repositorio: https://github.com/xic17/akena-watch
+
+## Documentación
+
+- [README](https://raw.githubusercontent.com/xic17/akena-watch/main/README.md): guía completa (características, arquitectura, configuración, API, despliegue y desarrollo).
+- [Documentación del sitio](https://akenawatch.com/documentacion.html): instalación, configuración, uso y despliegue resumidos.
+- [Registro de cambios](https://raw.githubusercontent.com/xic17/akena-watch/main/CHANGELOG.md): historial de versiones en formato Keep a Changelog.
+
+## Instalación y despliegue
+
+- [Instalador automático (install.sh)](https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/install.sh): descarga el binario de la última release y verifica su checksum SHA-256.
+- [Releases](https://github.com/xic17/akena-watch/releases): binarios por plataforma firmados con SHA256SUMS.
+- [Servicio systemd](https://raw.githubusercontent.com/xic17/akena-watch/main/deploy/akena-watch.service): unidad de ejemplo para Linux.
+- [Dockerfile](https://raw.githubusercontent.com/xic17/akena-watch/main/deploy/Dockerfile): imagen multi-stage.
+- [Cloudflare Containers](https://github.com/xic17/akena-watch/tree/main/deploy/cloudflare): Worker + contenedor con persistencia en R2.
+- [Licencia MIT](https://raw.githubusercontent.com/xic17/akena-watch/main/LICENSE)
+
+## Demos
+
+- [Página de estado pública (demo en vivo)](https://estatus.akenawatch.com)
+- [Dashboard de demostración](https://demo.akenawatch.com)
+
+## Optional
+
+- [Sitio web](https://akenawatch.com/): landing para personas, con características, demos y descargas.
+- [Sitemap](https://akenawatch.com/sitemap.xml)

@@ -33,6 +33,10 @@ body {
 a { color: var(--amber-strong); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* Enlaces dentro del contenido: siempre subrayados para no distinguirse solo
+   por color (WCAG 1.4.1). Los botones (.btn) quedan exentos. */
+main a:not(.btn) { text-decoration: underline; }
+
 /* --- Barra superior --- */
 .topbar {
   position: sticky;

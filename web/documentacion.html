@@ -8,6 +8,7 @@
   <meta name="author" content="Tupac de Paz">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://akenawatch.com/documentacion.html">
+  <link rel="describedby" href="/llms.txt">
   <meta name="theme-color" content="#0e1014">
 
   <!-- Open Graph -->
@@ -28,6 +29,31 @@
   <meta name="twitter:description" content="Instalación, configuración, uso y despliegue de Akena Watch.">
   <meta name="twitter:image" content="https://akenawatch.com/assets/og-image.png">
 
+  <!-- Datos estructurados -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://akenawatch.com/" },
+          { "@type": "ListItem", "position": 2, "name": "Documentación", "item": "https://akenawatch.com/documentacion.html" }
+        ]
+      },
+      {
+        "@type": "TechArticle",
+        "headline": "Documentación — Akena Watch",
+        "description": "Guía de instalación, configuración, uso y despliegue de Akena Watch en Linux, CloudPanel 2 y Cloudflare Containers.",
+        "url": "https://akenawatch.com/documentacion.html",
+        "inLanguage": "es",
+        "author": { "@type": "Person", "name": "Tupac de Paz" },
+        "isPartOf": { "@type": "WebSite", "name": "Akena Watch", "url": "https://akenawatch.com/" }
+      }
+    ]
+  }
+  </script>
+
   <link rel="icon" href="assets/paw.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -35,15 +61,15 @@
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="index.html">
+      <a class="brand" href="/">
         <svg class="paw" viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="15.5" cy="29" rx="4.8" ry="8.2" transform="rotate(-35 15.5 29)"/><ellipse cx="26" cy="17.5" rx="4.8" ry="8" transform="rotate(-12 26 17.5)"/><ellipse cx="38" cy="17.5" rx="4.8" ry="8" transform="rotate(12 38 17.5)"/><ellipse cx="48.5" cy="29" rx="4.8" ry="8.2" transform="rotate(35 48.5 29)"/><path d="M32 35 C29.5 32.5 26 33 24.5 36 C21.5 36.5 19 39.5 19.2 43.5 C19.5 49.5 25 55.5 32 55.5 C39 55.5 44.5 49.5 44.8 43.5 C45 39.5 42.5 36.5 39.5 36 C38 33 34.5 32.5 32 35 Z"/><path d="M32 40.5 C29 40.5 26.6 42.6 26.4 45 C25.2 45 24.4 46.2 24.4 47.6 C24.4 50.8 27.6 53.6 32 53.6 C36.4 53.6 39.6 50.8 39.6 47.6 C39.6 46.2 38.8 45 37.6 45 C37.4 42.6 35 40.5 32 40.5 Z" opacity="0.3"/></svg>
         <span class="brand-name">Akena Watch</span>
         <span class="brand-tagline">Siempre en Guardia</span>
       </a>
       <nav class="topnav">
-        <a href="index.html">Inicio</a>
-        <a href="index.html#caracteristicas">Características</a>
-        <a href="index.html#descargas">Descargas</a>
+        <a href="/">Inicio</a>
+        <a href="/#caracteristicas">Características</a>
+        <a href="/#descargas">Descargas</a>
         <a href="documentacion.html">Documentación</a>
         <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a>
       </nav>
@@ -95,7 +121,7 @@
         <h3>Opción B — Descarga manual</h3>
         <p>
           Descarga el binario correspondiente desde la
-          <a href="index.html#descargas">sección de descargas</a> o desde la
+          <a href="/#descargas">sección de descargas</a> o desde la
           <a href="https://github.com/xic17/akena-watch/releases" target="_blank" rel="noopener">página de releases</a>,
           hazlo ejecutable y cópialo donde quieras:
         </p>
@@ -261,9 +287,10 @@ docker run -d --name akena-watch -p 8080:8080 -v akena-data:/data akena-watch</c
         Siempre en Guardia — en memoria de Akena · Desarrollado por <a href="https://tupacdepaz.com" target="_blank" rel="noopener"><strong>Tupac de Paz</strong></a>
       </span>
       <span>
-        <a href="index.html">Inicio</a> ·
+        <a href="/">Inicio</a> ·
         <a href="https://github.com/xic17/akena-watch" target="_blank" rel="noopener">GitHub</a> ·
-        <a href="https://github.com/xic17/akena-watch/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a>
+        <a href="https://github.com/xic17/akena-watch/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a> ·
+        <a href="/llms.txt">Versión para agentes de IA</a>
       </span>
     </div>
   </footer>
