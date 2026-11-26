@@ -12,6 +12,12 @@
 //	AKENA_LOGIN_INTENTOS     fallos de acceso antes de bloquear (default: 5)
 //	AKENA_LOGIN_BLOQUEO_SEG  segundos de bloqueo inicial (default: 30)
 //	AKENA_LOGIN_MEMORIA_MIN  minutos que se recuerda un fallo (default: 15)
+//	AKENA_SOLO_PUBLICO       1 = no permitir destinos internos (loopback, rangos
+//	                         privados ni metadatos del cloud) desde monitores ni
+//	                         herramientas
+//	AKENA_DEMO_MIN           reinicia los datos cada N minutos (0 = desactivado);
+//	                         implica AKENA_SOLO_PUBLICO y silencia las alertas
+//	AKENA_DEMO_USER / AKENA_DEMO_PASS  administrador de la demo
 package main
 
 import (
@@ -22,10 +28,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
+	"akena-watch/internal/demo"
 	"akena-watch/internal/monitor"
+	"akena-watch/internal/netguard"
 	"akena-watch/internal/notifier"
 	"akena-watch/internal/server"
 	"akena-watch/internal/store"
@@ -42,6 +51,18 @@ func main() {
 	dataDir := envOr("AKENA_DATA_DIR", "./data")
 	bind := envOr("AKENA_BIND", "0.0.0.0")
 	port := envOr("AKENA_PORT", envOr("PORT", "8080"))
+	demoMin := envInt("AKENA_DEMO_MIN", 0)
+	soloPublico := demoMin > 0 || envOr("AKENA_SOLO_PUBLICO", "0") == "1"
+
+	// La política de red se fija antes de arrancar el planificador: los primeros
+	// checks ya deben cumplirla.
+	netguard.Configurar(soloPublico)
+	if soloPublico {
+		log.Println("política de red estricta: solo se permiten destinos públicos")
+	}
+	if demoMin > 0 {
+		log.Printf("modo demostración: los datos se reinician cada %d minutos", demoMin)
+	}
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		log.Fatalf("no se pudo crear el directorio de datos %q: %v", dataDir, err)
@@ -56,11 +77,30 @@ func main() {
 
 	hub := server.NewHub()
 	notify := notifier.NewManager(st)
+	if demoMin > 0 {
+		// La demo no puede enviar alertas: nadie usa la infraestructura del
+		// anfitrión para mandar mensajes a terceros.
+		notify.Silenciar(true)
+	}
 	sched := monitor.NewScheduler(st, hub, notify)
 	sched.Start()
 	defer sched.Stop()
 
 	srv := server.New(st, hub, notify, version)
+
+	if demoMin > 0 {
+		srv.Demo(demoMin)
+		pararDemo, err := demo.Iniciar(st, sched, demo.Config{
+			Cada:    time.Duration(demoMin) * time.Minute,
+			Usuario: envOr("AKENA_DEMO_USER", "akena"),
+			Clave:   envOr("AKENA_DEMO_PASS", "Demo2026!Secure"),
+		})
+		if err != nil {
+			log.Fatalf("modo demo: %v", err)
+		}
+		defer pararDemo()
+	}
+
 	httpSrv := &http.Server{
 		Addr:              bind + ":" + port,
 		Handler:           srv.Handler(),
@@ -88,6 +128,16 @@ func main() {
 func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+// envInt lee un entero no negativo; cualquier valor inválido deja el default.
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
 	}
 	return def
 }

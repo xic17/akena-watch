@@ -7,6 +7,8 @@ import (
 	"net/http/httptrace"
 	"strings"
 	"time"
+
+	"akena-watch/internal/netguard"
 )
 
 // handleHTTPCheck inspecciona una URL estilo curl desde el servidor:
@@ -76,25 +78,22 @@ func (s *Server) handleHTTPCheck(w http.ResponseWriter, r *http.Request) {
 		GotFirstResponseByte: func() { ttfbMs = float64(time.Since(start).Microseconds()) / 1000 },
 	}
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse // cortamos: la cadena ya es larga
-			}
-			// La respuesta que provocó la redirección viaja en req.Response
-			// (los requests de via no la traen): el status es el 3xx anterior.
-			status := 0
-			if req.Response != nil {
-				status = req.Response.StatusCode
-			}
-			redirects = append(redirects, map[string]any{
-				"status": status,
-				"url":    req.URL.String(),
-			})
-			return nil
-		},
-	}
+	client := netguard.Cliente(15*time.Second, func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return http.ErrUseLastResponse // cortamos: la cadena ya es larga
+		}
+		// La respuesta que provocó la redirección viaja en req.Response
+		// (los requests de via no la traen): el status es el 3xx anterior.
+		status := 0
+		if req.Response != nil {
+			status = req.Response.StatusCode
+		}
+		redirects = append(redirects, map[string]any{
+			"status": status,
+			"url":    req.URL.String(),
+		})
+		return nil
+	})
 
 	req, err := http.NewRequest(method, urlStr, strings.NewReader(in.Body))
 	if err != nil {

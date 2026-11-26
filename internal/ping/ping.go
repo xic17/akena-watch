@@ -12,6 +12,8 @@ import (
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+
+	"akena-watch/internal/netguard"
 )
 
 // Protocolos soportados.
@@ -73,7 +75,7 @@ func (c Config) ping(ctx context.Context, seq int) Result {
 
 func tcpPing(ctx context.Context, host string, port, seq int) Result {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	d := net.Dialer{}
+	d := netguard.Dialer(0)
 	start := time.Now()
 	conn, err := d.DialContext(ctx, "tcp", addr)
 	latency := int(time.Since(start).Milliseconds())

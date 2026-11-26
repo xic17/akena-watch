@@ -22,6 +22,8 @@ import (
 
 	"github.com/likexian/whois"
 	"golang.org/x/net/publicsuffix"
+
+	"akena-watch/internal/netguard"
 )
 
 // ErrSinFecha indica que el registro existe pero no publica (o no se ha sabido
@@ -142,7 +144,7 @@ func viaRDAP(ctx context.Context, dom string) (time.Time, string, error) {
 		return time.Time{}, "", err
 	}
 	req.Header.Set("Accept", "application/rdap+json, application/json")
-	res, err := http.DefaultClient.Do(req)
+	res, err := netguard.Cliente(httpTimeout, nil).Do(req)
 	if err != nil {
 		return time.Time{}, "", err
 	}

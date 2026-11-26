@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"akena-watch/internal/domain"
+	"akena-watch/internal/netguard"
 	"akena-watch/internal/notifier"
 	"akena-watch/internal/store"
 )
@@ -69,6 +70,15 @@ func (s *Scheduler) Start() {
 func (s *Scheduler) Stop() {
 	close(s.stop)
 	<-s.done
+}
+
+// Reset olvida el estado en memoria de todos los monitores. Lo usa el modo demo
+// al reiniciar los datos: los identificadores cambian y el estado anterior no
+// sirve (dejaría monitores zombis en el mapa).
+func (s *Scheduler) Reset() {
+	s.mu.Lock()
+	s.state = make(map[int64]*monState)
+	s.mu.Unlock()
 }
 
 func (s *Scheduler) loop() {
@@ -315,7 +325,7 @@ func certDaysLeft(rawURL string) int {
 	if h, p, err := net.SplitHostPort(u.Host); err == nil {
 		host, port = h, p
 	}
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp",
+	conn, err := tls.DialWithDialer(netguard.Dialer(10*time.Second), "tcp",
 		net.JoinHostPort(host, port), &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		return -1

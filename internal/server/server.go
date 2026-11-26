@@ -22,6 +22,7 @@ type Server struct {
 	version string
 	pages   map[string]*template.Template
 	limite  *loginLimiter
+	demoMin int // 0 = instancia normal; > 0 = demo que se reinicia
 }
 
 // New construye el servidor. Cada página vive en un clon del template
@@ -41,6 +42,11 @@ func New(st *store.Store, hub *Hub, notify *notifier.Manager, version string) *S
 		limite: newLoginLimiter(loginLimitFromEnv()),
 	}
 }
+
+// Demo marca la instancia como demostración: minutos entre reinicios de datos
+// (0 = instancia normal). Solo cambia el aviso que se muestra en la interfaz;
+// el reinicio lo lleva el paquete demo.
+func (s *Server) Demo(minutos int) { s.demoMin = minutos }
 
 // Handler construye el mux con todas las rutas y la cadena de middlewares.
 func (s *Server) Handler() http.Handler {

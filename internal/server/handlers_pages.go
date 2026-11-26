@@ -16,12 +16,16 @@ type pageData struct {
 	StatusTitle string
 	StatusDesc  string
 	Version     string
+	Demo        bool
+	DemoMin     int
 }
 
 // render ejecuta la plantilla base (que incluye los bloques "title" y
 // "content" de la página indicada) con los datos proporcionados.
 func (s *Server) render(w http.ResponseWriter, name string, data pageData) {
 	data.Version = s.version // la versión se inyecta en todas las páginas
+	data.Demo = s.demoMin > 0
+	data.DemoMin = s.demoMin
 	page, ok := s.pages[name]
 	if !ok {
 		http.NotFound(w, nil)

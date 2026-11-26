@@ -5,6 +5,27 @@ Todos los cambios notables de **Akena Watch — Siempre en Guardia**.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el
 proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Añadido
+
+- **Modo demostración** (`AKENA_DEMO_MIN`): convierte la instancia en una demo
+  pública que se limpia sola. Cada N minutos borra usuarios, monitores, canales,
+  historial y sesiones, y vuelve a crear el administrador y tres monitores de
+  ejemplo; el estado del planificador también se descarta, así que no quedan
+  monitores zombis. Silencia las alertas (nadie envía mensajes desde la
+  infraestructura del anfitrión), activa la política de red estricta y muestra un
+  aviso con el intervalo de reinicio. Credenciales configurables con
+  `AKENA_DEMO_USER` y `AKENA_DEMO_PASS`.
+- **Política de red (anti-SSRF)**: todas las salidas —monitores HTTP/TCP, DNS de
+  certificado, inspección HTTP, certificado TLS, escaneo de puertos, ping y
+  canales de alerta— pasan por el mismo guardián. Link-local (incluidos los
+  metadatos del cloud, `169.254.169.254`), direcciones no especificadas y
+  multicast se rechazan siempre; con `AKENA_SOLO_PUBLICO=1` (o en modo demo)
+  también loopback, rangos privados y CGNAT. La comprobación se hace al conectar
+  con la IP ya resuelta, así que una redirección o un DNS que cambie de IP no la
+  esquivan.
+
 ## [1.2.1] — 2026-11-26
 
 ### Dependencias
@@ -278,6 +299,7 @@ se conservan.
 - Despliegue documentado en Linux (systemd), **CloudPanel 2** (reverse proxy),
   **Cloudflare Containers** y Docker.
 
+[Sin publicar]: https://github.com/xic17/akena-watch/compare/v1.2.1...HEAD
 [1.2.1]: https://github.com/xic17/akena-watch/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/xic17/akena-watch/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/xic17/akena-watch/compare/v1.1.0...v1.1.1

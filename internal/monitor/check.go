@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"akena-watch/internal/netguard"
 	"akena-watch/internal/store"
 )
 
@@ -52,15 +53,13 @@ func checkHTTP(ctx context.Context, m store.Monitor) Result {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	client := &http.Client{
-		Timeout: time.Duration(m.TimeoutS) * time.Second,
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+	client := netguard.Cliente(time.Duration(m.TimeoutS)*time.Second,
+		func(_ *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return errors.New("demasiadas redirecciones")
 			}
 			return nil
-		},
-	}
+		})
 
 	start := time.Now()
 	resp, err := client.Do(req)
@@ -104,7 +103,7 @@ func checkTCP(ctx context.Context, m store.Monitor) Result {
 		host = net.JoinHostPort(host, "80")
 	}
 
-	d := net.Dialer{Timeout: time.Duration(m.TimeoutS) * time.Second}
+	d := netguard.Dialer(time.Duration(m.TimeoutS) * time.Second)
 	start := time.Now()
 	conn, err := d.DialContext(ctx, "tcp", host)
 	latency := int(time.Since(start).Milliseconds())

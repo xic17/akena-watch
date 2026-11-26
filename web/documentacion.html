@@ -156,6 +156,8 @@ chmod +x akena-watch
             <tr><td><code>AKENA_LOGIN_INTENTOS</code></td><td><code>5</code></td><td>Fallos de acceso permitidos antes de bloquear</td></tr>
             <tr><td><code>AKENA_LOGIN_BLOQUEO_SEG</code></td><td><code>30</code></td><td>Segundos de bloqueo inicial (se dobla con cada fallo extra, tope 10 min)</td></tr>
             <tr><td><code>AKENA_LOGIN_MEMORIA_MIN</code></td><td><code>15</code></td><td>Minutos que se recuerda un fallo sin más actividad</td></tr>
+            <tr><td><code>AKENA_SOLO_PUBLICO</code></td><td>—</td><td><code>1</code> = bloquea destinos internos (loopback, rangos privados y metadatos del cloud) en monitores y herramientas</td></tr>
+            <tr><td><code>AKENA_DEMO_MIN</code></td><td>—</td><td>Reinicia los datos cada N minutos (implica lo anterior y silencia las alertas)</td></tr>
           </tbody>
         </table>
         <pre><code><span class="cmt"># ejemplos</span>
@@ -264,6 +266,7 @@ docker run -d --name akena-watch -p 8080:8080 -v akena-data:/data akena-watch</c
         <ul>
           <li>Contraseñas hasheadas con bcrypt; sesiones con token aleatorio en cookie HttpOnly.</li>
           <li>Protección contra fuerza bruta: tras 5 fallos el acceso se bloquea para esa cuenta y esa IP, con espera creciente (tope 10 minutos). Un acierto borra el historial.</li>
+          <li>Política de red: monitores y herramientas no pueden alcanzar direcciones link-local (incluidos los metadatos del cloud) y, con <code>AKENA_SOLO_PUBLICO=1</code> o en modo demo, tampoco loopback ni rangos privados.</li>
           <li>Protección CSRF: las peticiones de estado con <code>Origin</code> de otro host se rechazan.</li>
           <li>La base de datos vive en el directorio que tú protejas (<code>AKENA_DATA_DIR</code>).</li>
         </ul>

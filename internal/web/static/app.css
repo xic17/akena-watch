@@ -36,6 +36,17 @@ body {
 a { color: var(--amber-strong); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* --- Aviso de modo demostración (AKENA_DEMO_MIN) --- */
+.demo-banner {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.16), rgba(245, 158, 11, 0.04));
+  border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--amber-strong);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px 16px;
+  text-align: center;
+}
+
 /* --- Barra superior --- */
 .topbar {
   position: sticky;

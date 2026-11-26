@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"akena-watch/internal/netguard"
 )
 
 // maxScanPorts limita cuántos puertos se pueden escanear por petición.
@@ -117,7 +119,7 @@ func (s *Server) handlePortScan(w http.ResponseWriter, r *http.Request) {
 			defer func() { <-sem }()
 			addr := net.JoinHostPort(ip.String(), strconv.Itoa(port))
 			t0 := time.Now()
-			conn, err := net.DialTimeout("tcp", addr, 700*time.Millisecond)
+			conn, err := netguard.Dialer(700*time.Millisecond).Dial("tcp", addr)
 			lat := int(time.Since(t0).Milliseconds())
 			if err != nil {
 				return

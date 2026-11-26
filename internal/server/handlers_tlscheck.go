@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"akena-watch/internal/netguard"
 )
 
 // handleTLSCheck inspecciona el certificado TLS de un servidor: validez,
@@ -52,7 +54,7 @@ func (s *Server) handleTLSCheck(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 	addr := net.JoinHostPort(host, strconv.Itoa(in.Port))
-	raw, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	raw, err := netguard.Dialer(10*time.Second).Dial("tcp", addr)
 	if err != nil {
 		writeOK(w, map[string]any{
 			"host": host, "port": in.Port, "success": false,

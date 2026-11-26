@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="/static/app.css?v={{.Version}}">
 </head>
 <body>
+  {{if .Demo}}
+  <div class="demo-banner" role="status">
+    <strong>Entorno de demostración</strong> — los datos y la sesión se reinician cada {{.DemoMin}} min.
+  </div>
+  {{end}}
   {{if .User}}
   <header class="topbar">
     <div class="topbar-inner">

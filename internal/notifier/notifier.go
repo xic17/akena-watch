@@ -5,22 +5,31 @@ package notifier
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/smtp"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"akena-watch/internal/netguard"
 	"akena-watch/internal/store"
 )
 
 // Manager despacha alertas usando los canales asociados a cada monitor.
 type Manager struct {
 	st *store.Store
+	// silenciado lo activa el modo demo: nadie puede hacer que la instancia
+	// envíe alertas (ni con un webhook propio) usando la infraestructura ajena.
+	silenciado atomic.Bool
 }
 
 func NewManager(st *store.Store) *Manager { return &Manager{st: st} }
+
+// Silenciar activa o desactiva el envío real de alertas.
+func (m *Manager) Silenciar(v bool) { m.silenciado.Store(v) }
 
 // vars son los valores disponibles en las plantillas de cuerpo JSON de
 // los webhooks (estilo Uptime Kuma).
@@ -38,6 +47,9 @@ type vars struct {
 // Send notifica un cambio de estado. recovery=true significa que el
 // monitor volvió a estar en línea.
 func (m *Manager) Send(mon store.Monitor, detail string, latencyMS int, at time.Time, recovery bool) {
+	if m.silenciado.Load() {
+		return
+	}
 	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
 	if err != nil || len(channels) == 0 {
 		return
@@ -97,6 +109,9 @@ func formatMessage(mon store.Monitor, detail string, latencyMS int, at time.Time
 // SendSlow notifica que el monitor lleva varios checks por encima del umbral
 // de lentitud. recovery=false no aplica: es un estado intermedio, no una caída.
 func (m *Manager) SendSlow(mon store.Monitor, detail string, latencyMS int, at time.Time) {
+	if m.silenciado.Load() {
+		return
+	}
 	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
 	if err != nil || len(channels) == 0 {
 		return
@@ -142,6 +157,9 @@ func formatSlowMessage(mon store.Monitor, detail string, latencyMS int, at time.
 // SendCert notifica que el certificado TLS de un monitor HTTPS está a punto
 // de expirar (o ya expiró). {{status}} = "cert" en las plantillas.
 func (m *Manager) SendCert(mon store.Monitor, detail string, at time.Time) {
+	if m.silenciado.Load() {
+		return
+	}
 	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
 	if err != nil || len(channels) == 0 {
 		return
@@ -186,6 +204,9 @@ func (m *Manager) NotifyOwnerCert(mon store.Monitor, detail string, at time.Time
 // SendDomain notifica que el dominio del monitor está a punto de vencer (o ya
 // venció). {{status}} = "domain" en las plantillas.
 func (m *Manager) SendDomain(mon store.Monitor, detail string, at time.Time) {
+	if m.silenciado.Load() {
+		return
+	}
 	channels, err := m.st.ListNotificationsForMonitor(mon.ID)
 	if err != nil || len(channels) == 0 {
 		return
@@ -232,6 +253,9 @@ func (m *Manager) NotifyOwnerDomain(mon store.Monitor, detail string, at time.Ti
 // Las variables de la plantilla se rellenan con valores de ejemplo
 // para que se vea el renderizado del cuerpo personalizado.
 func (m *Manager) Test(ch store.Notification) error {
+	if m.silenciado.Load() {
+		return errors.New("las notificaciones están desactivadas en el entorno de demostración")
+	}
 	now := time.Now()
 	return sendChannel(ch, testMessage, vars{
 		MonitorName: "Monitor de prueba",
@@ -260,6 +284,9 @@ func (m *Manager) NotifyOwnerSlow(mon store.Monitor, detail string, latencyMS in
 }
 
 func (m *Manager) notifyOwnerText(mon store.Monitor, text string, at time.Time) {
+	if m.silenciado.Load() {
+		return
+	}
 	owner, err := m.st.GetUserByID(mon.OwnerID)
 	if err != nil || strings.TrimSpace(owner.TelegramID) == "" {
 		return
@@ -276,7 +303,7 @@ func (m *Manager) notifyOwnerText(mon store.Monitor, text string, at time.Time) 
 		return
 	}
 	go func() {
-		client := &http.Client{Timeout: 15 * time.Second}
+		client := netguard.Cliente(15*time.Second, nil)
 		if err := sendTelegramMsg(client, cfg.BotToken, owner.TelegramID, text); err != nil {
 			log.Printf("aviso al propietario %q (monitor %d): %v", owner.Username, mon.ID, err)
 		}
@@ -286,7 +313,7 @@ func (m *Manager) notifyOwnerText(mon store.Monitor, text string, at time.Time) 
 // --- Canales ---
 
 func sendChannel(ch store.Notification, text string, v vars) error {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := netguard.Cliente(15*time.Second, nil)
 	switch ch.Type {
 	case store.NotifWebhook:
 		return sendWebhook(client, ch.Config, text, v)

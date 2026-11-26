@@ -66,6 +66,8 @@ contenedor? → [Despliegue](#despliegue) · Sitio y binarios: <https://akenawat
     - [Whois](#whois)
     - [DNS Lookup](#dns-lookup)
 11. [Configuración](#configuración)
+    - [Ejemplos al ejecutar](#ejemplos-al-ejecutar)
+    - [Modo demostración](#modo-demostración)
 12. [Despliegue](#despliegue)
     - [Linux plano (systemd)](#linux-plano-systemd)
     - [CloudPanel 2](#cloudpanel-2)
@@ -539,6 +541,10 @@ Todo se configura con variables de entorno — el binario es agnóstico de plata
 | `AKENA_LOGIN_INTENTOS` | `5` | Fallos de acceso permitidos antes de bloquear |
 | `AKENA_LOGIN_BLOQUEO_SEG` | `30` | Segundos de bloqueo inicial (se dobla con cada fallo extra, tope 10 min) |
 | `AKENA_LOGIN_MEMORIA_MIN` | `15` | Minutos que se recuerda un fallo sin más actividad |
+| `AKENA_SOLO_PUBLICO` | — | `1` = bloquea destinos internos (loopback, rangos privados y metadatos del cloud) en monitores y herramientas |
+| `AKENA_DEMO_MIN` | — | Reinicia los datos cada N minutos (implica lo anterior y silencia las alertas) |
+| `AKENA_DEMO_USER` | `akena` | Administrador de la demo |
+| `AKENA_DEMO_PASS` | `Demo2026!Secure` | Contraseña del administrador de la demo |
 
 Las credenciales de canales de alerta (tokens, contraseñas SMTP) se guardan en la
 base de datos, que a su vez vive en el directorio que tú protejas.
@@ -562,6 +568,31 @@ Con systemd, edita la línea `Environment=AKENA_PORT=...` en
 ```sh
 sudo systemctl daemon-reload && sudo systemctl restart akena-watch
 ```
+
+### Modo demostración
+
+`AKENA_DEMO_MIN=15` convierte la instancia en una demo pública que se limpia sola:
+
+- **Reinicio de datos**: cada N minutos borra usuarios, monitores, canales,
+  historial y sesiones, y vuelve a crear el administrador y tres monitores de
+  ejemplo. No hace falta cron ni reiniciar el proceso: también se descarta el
+  estado del planificador, así que no quedan monitores zombis corriendo.
+- **Alertas silenciadas**: aunque alguien cree un webhook o un bot de Telegram, la
+  instancia no envía nada (el botón «Probar» responde que las notificaciones
+  están desactivadas). Nadie usa tu infraestructura para mandar mensajes.
+- **Política de red estricta** (lo mismo que `AKENA_SOLO_PUBLICO=1`): monitores y
+  herramientas no pueden alcanzar loopback, rangos privados ni los metadatos del
+  cloud. Los destinos públicos siguen funcionando con normalidad.
+- **Aviso en la interfaz** con el intervalo de reinicio.
+- **Credenciales**: `AKENA_DEMO_USER` (por defecto `akena`) y `AKENA_DEMO_PASS`
+  (por defecto `Demo2026!Secure`), configurables.
+
+```sh
+AKENA_DEMO_MIN=15 AKENA_BIND=127.0.0.1 AKENA_PORT=8080 ./akena-watch
+```
+
+Las sesiones se cierran en cada reinicio; es lo esperado en una demo (y quien
+esté explorando entra otra vez con las mismas credenciales).
 
 ---
 
@@ -756,6 +787,12 @@ Resumen de los endpoints principales (JSON; autenticación por cookie de sesión
   informa en `X-Real-IP` o `X-Forwarded-For`, y solo desde loopback. Los intentos
   fallidos quedan en el log con usuario e IP, nunca con la contraseña probada.
 - **CSRF**: las peticiones de estado con `Origin` de otro host se rechazan.
+- **Política de red**: las direcciones link-local (incluidos los metadatos del
+  cloud, `169.254.169.254`), no especificadas y multicast se rechazan siempre, en
+  monitores, herramientas y canales. Con `AKENA_SOLO_PUBLICO=1` —o en modo demo—
+  tampoco se permite loopback, rangos privados ni CGNAT. La comprobación se hace
+  al conectar, con la IP ya resuelta, así que una redirección o un DNS cambiante
+  tampoco se cuelan.
 - Validación estricta de entradas en el servidor (longitudes, tipos, rangos).
 - No se puede eliminar ni degradar al **último administrador**.
 - En CloudPanel se recomienda `AKENA_BIND=127.0.0.1` (el nginx del panel

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"akena-watch/internal/netguard"
 	"akena-watch/internal/ping"
 )
 
@@ -122,6 +123,12 @@ func (s *Server) handlePingWS(w http.ResponseWriter, r *http.Request) {
 		case "start":
 			cfg, err := parsePingConfig(msg)
 			if err != nil {
+				send(map[string]any{"type": "error", "error": err.Error()})
+				continue
+			}
+			// Misma política de red que el resto de salidas (incluye ICMP, que
+			// no pasa por el dialer).
+			if err := netguard.Comprobar(cfg.Host); err != nil {
 				send(map[string]any{"type": "error", "error": err.Error()})
 				continue
 			}
