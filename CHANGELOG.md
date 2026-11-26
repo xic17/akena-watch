@@ -5,7 +5,7 @@ Todos los cambios notables de **Akena Watch — Siempre en Guardia**.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el
 proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
-## [Sin publicar]
+## [1.3.0] — 2026-11-26
 
 ### Añadido
 
@@ -25,6 +25,10 @@ proyecto usa versionado [SemVer](https://semver.org/lang/es/).
   también loopback, rangos privados y CGNAT. La comprobación se hace al conectar
   con la IP ya resuelta, así que una redirección o un DNS que cambie de IP no la
   esquivan.
+- **El sitio muestra las cifras del repositorio**: estrellas, forks y personas
+  observando, tomadas de la API pública de GitHub y enlazadas a su página. Se
+  hornean en el HTML (siempre hay algo visible) y se refrescan en el navegador con
+  una caché de 10 minutos para respetar el límite de la API sin autenticar.
 
 ## [1.2.1] — 2026-11-26
 
@@ -299,7 +303,7 @@ se conservan.
 - Despliegue documentado en Linux (systemd), **CloudPanel 2** (reverse proxy),
   **Cloudflare Containers** y Docker.
 
-[Sin publicar]: https://github.com/xic17/akena-watch/compare/v1.2.1...HEAD
+[1.3.0]: https://github.com/xic17/akena-watch/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/xic17/akena-watch/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/xic17/akena-watch/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/xic17/akena-watch/compare/v1.1.0...v1.1.1
