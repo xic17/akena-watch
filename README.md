@@ -20,6 +20,32 @@ falla. El mismo ejecutable corre en Linux plano, detrás de **CloudPanel 2** o e
 
 ---
 
+## Instalación en 30 segundos
+
+```sh
+# 1) descarga el binario de la última release (Linux x86_64)
+curl -fsSL -o akena-watch https://github.com/xic17/akena-watch/releases/latest/download/akena-watch-linux-amd64
+chmod +x akena-watch
+
+# 2) ejecútalo (datos en ./data, puerto 8080)
+./akena-watch
+```
+
+Abre <http://localhost:8080>: el asistente te pedirá crear el administrador.
+
+O con el instalador, que detecta la plataforma, **verifica el `SHA256SUMS`** y lo
+deja listo en `/usr/local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/xic17/akena-watch/main/scripts/install.sh | sh
+```
+
+¿ARM o macOS? En la misma release están `akena-watch-linux-arm64`,
+`akena-watch-darwin-amd64` y `akena-watch-darwin-arm64`. ¿systemd, CloudPanel 2 o
+contenedor? → [Despliegue](#despliegue) · Sitio y binarios: <https://akenawatch.com>
+
+---
+
 ## Contenido
 
 1. [Características](#características)

@@ -14,20 +14,23 @@
 set -e
 
 # --- detectar repositorio ---
+# 1. AKENA_REPO si se indica. 2. El remoto de git, pero solo si es un repo
+#    llamado akena-watch (así los forks siguen funcionando). 3. El oficial: es el
+#    caso de quien ejecuta el instalador con `curl | sh` sin haber clonado nada,
+#    donde git no resuelve el remoto (o, peor, resolvería el de otro proyecto).
 REPO="${AKENA_REPO:-}"
 if [ -z "$REPO" ]; then
   REMOTE=$(git config --get remote.origin.url 2>/dev/null || true)
   case "$REMOTE" in
     *github.com*)
-      REPO=$(echo "$REMOTE" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
+      CANDIDATO=$(echo "$REMOTE" | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
+      case "$CANDIDATO" in
+        */akena-watch) REPO="$CANDIDATO" ;;
+      esac
       ;;
   esac
 fi
-if [ -z "$REPO" ]; then
-  echo "No se pudo detectar el repositorio." >&2
-  echo "Pásalo explícitamente: AKENA_REPO=usuario/akena-watch sh scripts/install.sh" >&2
-  exit 1
-fi
+[ -n "$REPO" ] || REPO="xic17/akena-watch"
 
 # --- detectar plataforma ---
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

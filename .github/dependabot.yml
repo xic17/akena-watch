@@ -1,0 +1,39 @@
+# Actualizaciones automáticas de dependencias.
+# Los cambios de versión mayor llegan como PR normal, sin agrupar, para
+# revisarlos uno a uno.
+version: 2
+updates:
+  # Módulos Go del binario.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      go:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Acciones de GitHub usadas en los workflows.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Worker de Cloudflare (deploy/cloudflare). Menos frecuente: no forma parte
+  # del binario que se publica.
+  - package-ecosystem: npm
+    directory: "/deploy/cloudflare"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Permisos mínimos: el flujo solo lee el código (compila, prueba y valida).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
