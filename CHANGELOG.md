@@ -5,6 +5,27 @@ Todos los cambios notables de **Akena Watch — Siempre en Guardia**.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el
 proyecto usa versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.2.1] — 2026-11-26
+
+### Dependencias
+
+- `golang.org/x/crypto` 0.55 → 0.59, `golang.org/x/net` 0.57 → 0.62 y
+  `modernc.org/sqlite` 1.57 → 1.63 (este último eleva el mínimo de Go a 1.26).
+- Acciones de GitHub al día: `checkout@v7`, `setup-go@v7`, `configure-pages@v6`,
+  `upload-pages-artifact@v5` y `deploy-pages@v5`.
+- Dependabot configurado para los módulos Go, las acciones y el worker de
+  Cloudflare.
+
+### Corregido
+
+- **CI toma la versión de Go de `go.mod`** (`go-version-file`). Antes el flujo
+  fijaba una versión a mano; cuando una dependencia subió el mínimo a 1.26 el
+  build se rompió. Ahora no puede desincronizarse.
+- **El instalador de la release detecta bien el repositorio**: si `AKENA_REPO` no
+  está definido y el remoto de git no es un repo `akena-watch`, usa el oficial.
+  Antes, al ejecutarlo con `curl | sh` desde otro proyecto, cogía el remoto de
+  ese proyecto. El `install.sh` que se adjunta a esta release ya lo incluye.
+
 ## [1.2.0] — 2026-10-03
 
 ### Añadido
@@ -257,6 +278,7 @@ se conservan.
 - Despliegue documentado en Linux (systemd), **CloudPanel 2** (reverse proxy),
   **Cloudflare Containers** y Docker.
 
+[1.2.1]: https://github.com/xic17/akena-watch/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/xic17/akena-watch/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/xic17/akena-watch/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/xic17/akena-watch/compare/v1.0.7...v1.1.0
