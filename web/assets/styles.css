@@ -35,7 +35,7 @@ a:hover { text-decoration: underline; }
 
 /* Enlaces dentro del contenido: siempre subrayados para no distinguirse solo
    por color (WCAG 1.4.1). Los botones (.btn) quedan exentos. */
-main a:not(.btn) { text-decoration: underline; }
+main a:not(.btn):not(.gh-stat) { text-decoration: underline; }
 
 /* --- Barra superior --- */
 .topbar {
@@ -107,22 +107,61 @@ section + section { border-top: 1px solid var(--border); }
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 22px;
-  margin-top: 24px;
-  font-size: 14px;
-  color: var(--muted);
+  gap: 10px;
+  margin-top: 26px;
 }
-.gh-stats a {
+.gh-stat {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--muted);
+  gap: 11px;
+  min-width: 138px;
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.gh-stat:hover {
+  border-color: var(--amber);
+  transform: translateY(-1px);
   text-decoration: none;
 }
-.gh-stats a:hover { color: var(--text); text-decoration: none; }
-.gh-stats svg { color: var(--amber); opacity: 0.85; }
-.gh-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
-.gh-stats a:hover strong { color: var(--amber-strong); }
+.gh-stat svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--amber);
+}
+.gh-stat-txt {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.12;
+  text-align: left;
+}
+.gh-stat .n,
+.gh-stat .l { text-decoration: none; }
+.gh-stat .n {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.gh-stat .l {
+  color: var(--muted);
+  font-size: 11.5px;
+  letter-spacing: 0.2px;
+}
+.gh-stat:hover .n { color: var(--amber-strong); }
+
+@media (max-width: 560px) {
+  .gh-stats { gap: 8px; }
+  .gh-stat {
+    flex: 1 1 100%;
+    max-width: 280px;
+    justify-content: center;
+  }
+}
 
 /* --- Botones --- */
 .btn {
