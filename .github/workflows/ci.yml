@@ -17,9 +17,10 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          # La misma versión que declara go.mod: si no, CI solo pasa porque Go
-          # descarga la versión mayor en silencio (y el toolchain nuevo lo impide).
-          go-version: "1.25"
+          # La versión la manda go.mod: si una dependencia sube el mínimo de Go,
+          # CI lo sigue solo y no hay que tocar el workflow.
+          go-version-file: go.mod
+          cache: true
 
       - name: Formato (gofmt)
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
