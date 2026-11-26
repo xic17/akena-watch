@@ -102,6 +102,28 @@ section + section { border-top: 1px solid var(--border); }
 .hero .lead { color: var(--muted); max-width: 640px; margin: 0 auto 32px; }
 .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
+/* --- Estadísticas de GitHub (se refrescan en vivo) --- */
+.gh-stats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.gh-stats a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.gh-stats a:hover { color: var(--text); text-decoration: none; }
+.gh-stats svg { color: var(--amber); opacity: 0.85; }
+.gh-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.gh-stats a:hover strong { color: var(--amber-strong); }
+
 /* --- Botones --- */
 .btn {
   display: inline-block;
